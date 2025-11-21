@@ -1708,10 +1708,10 @@ export class ProductsService {
         if (!acc[catName]) acc[catName] = [];
         acc[catName].push(p);
         return acc;
-      }, {} as Record<string, typeof products>);
+      }, {} as Record<string, typeof products[number][]>);
       
       console.log('📋 [GET-DRAFT] Produits par catégorie:');
-      Object.entries(productsByCategory).forEach(([catName, prods]) => {
+      Object.entries(productsByCategory).forEach(([catName, prods]: [string, typeof products[number][]]) => {
         console.log(`  - ${catName}: ${prods.length} produit(s)`);
       });
       

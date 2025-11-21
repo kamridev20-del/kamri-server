@@ -5,22 +5,21 @@ import Stripe from 'stripe';
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
-  private stripe: Stripe;
+  private stripe: Stripe | null;
 
   constructor(private prisma: PrismaService) {
     const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
     
     if (!stripeSecretKey) {
-      this.logger.error('❌ STRIPE_SECRET_KEY n\'est pas définie dans les variables d\'environnement');
-      this.logger.error('⚠️ Veuillez définir STRIPE_SECRET_KEY dans votre fichier .env');
-      throw new Error('STRIPE_SECRET_KEY is not configured. Please set it in your .env file');
+      this.logger.warn('⚠️ STRIPE_SECRET_KEY n\'est pas définie - Les fonctionnalités de paiement seront désactivées');
+      this.logger.warn('💡 Pour activer Stripe, définissez STRIPE_SECRET_KEY dans vos variables d\'environnement');
+      this.stripe = null;
+    } else {
+      this.stripe = new Stripe(stripeSecretKey, {
+        apiVersion: '2023-10-16',
+      });
+      this.logger.log('✅ Stripe initialisé avec succès');
     }
-    
-    this.stripe = new Stripe(stripeSecretKey, {
-      apiVersion: '2023-10-16',
-    });
-    
-    this.logger.log('✅ Stripe initialisé avec succès');
   }
 
   async createPaymentIntent(amount: number, currency: string = 'usd') {
@@ -51,6 +50,11 @@ export class PaymentsService {
   }
 
   async handleWebhook(payload: string, signature: string) {
+    if (!this.stripe) {
+      this.logger.error('❌ Stripe n\'est pas initialisé - Webhook ignoré');
+      throw new Error('Stripe is not initialized');
+    }
+    
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
     
     try {
@@ -240,6 +244,11 @@ export class PaymentsService {
 
   // ✅ Créer un remboursement
   async confirmPaymentIntent(paymentIntentId: string) {
+    if (!this.stripe) {
+      this.logger.error('❌ Stripe n\'est pas initialisé');
+      throw new Error('Stripe is not initialized');
+    }
+    
     this.logger.log(`💳 Confirmation PaymentIntent: ${paymentIntentId}`);
     
     try {
