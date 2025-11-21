@@ -1,0 +1,48 @@
+# Fichiers à ignorer lors du déploiement Railway
+
+# Dépendances (installées par Railway)
+node_modules/
+.pnpm-store/
+
+# Build local
+dist/
+build/
+
+# Fichiers de développement
+*.log
+*.db
+*.sqlite
+.env.local
+.env.development
+
+# Tests
+coverage/
+.nyc_output/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Scripts de développement
+scripts/test-*.ts
+scripts/test-*.js
+*.test.ts
+*.test.js
+*.spec.ts
+*.spec.js
+
+# Documentation
+*.md
+!README.md
+
+# Fichiers temporaires
+tmp/
+temp/
+*.tmp
+
