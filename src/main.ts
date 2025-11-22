@@ -100,10 +100,16 @@ async function bootstrap() {
   SwaggerModule.setup('api/docs', app, document);
 
   const port = process.env.PORT || 3001;
-  await app.listen(port);
-  console.log(`🚀 Server running on http://localhost:${port}`);
-  console.log(`📚 API Documentation: http://localhost:${port}/api/docs`);
+  
+  // Écouter sur toutes les interfaces (0.0.0.0) pour Railway
+  await app.listen(port, '0.0.0.0');
+  console.log(`🚀 Server running on http://0.0.0.0:${port}`);
+  console.log(`📚 API Documentation: http://0.0.0.0:${port}/api/docs`);
+  console.log(`💚 Health check: http://0.0.0.0:${port}/api/health`);
 }
 
-bootstrap();
+bootstrap().catch((error) => {
+  console.error('❌ Erreur fatale au démarrage:', error);
+  process.exit(1);
+});
 

@@ -23,9 +23,12 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     try {
       await this.$connect();
       this.logger.log('✅ Connexion à la base de données établie');
-    } catch (error) {
-      this.logger.error('❌ Erreur de connexion à la base de données:', error);
-      throw error;
+    } catch (error: any) {
+      this.logger.error('❌ Erreur de connexion à la base de données:', error?.message || error);
+      if (error?.message?.includes('too many clients')) {
+        this.logger.error('💡 Solution: Ajoutez ?connection_limit=10&pool_timeout=20 à votre DATABASE_URL');
+      }
+      throw error; // Laisser le service échouer si la DB n'est pas accessible
     }
   }
 
