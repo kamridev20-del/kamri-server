@@ -88,7 +88,9 @@ export class CJAPIClient {
   // Verrou global partagé entre toutes les instances pour garantir 1 requête/seconde
   private static globalLastRequestTime = 0;
   private static globalRequestLock = false;
-  private static readonly MIN_INTERVAL = 1200; // 1.2 secondes minimum entre requêtes
+  private static readonly MIN_INTERVAL = 1500; // ✅ 1.5 secondes minimum entre requêtes (sécurité)
+  private readonly isProduction = process.env.NODE_ENV === 'production';
+  private readonly enableVerboseLogs = process.env.CJ_VERBOSE_LOGS === 'true'; // Optionnel pour debug
 
   constructor(
     private configService: ConfigService,
@@ -205,7 +207,9 @@ export class CJAPIClient {
   async login(): Promise<void> {
     try {
       this.checkConfig();
-      this.logger.log('🔐 Authentification avec CJ Dropshipping...');
+      if (!this.isProduction || this.enableVerboseLogs) {
+        this.logger.debug('🔐 Authentification CJ...');
+      }
       this.logger.log('Config:', JSON.stringify(this.config, null, 2));
       
       const response = await this.axiosInstance.post('/authentication/getAccessToken', {
@@ -237,34 +241,36 @@ export class CJAPIClient {
    * Rafraîchir le token d'accès
    */
   /**
-   * Calcule le délai optimal basé sur le niveau utilisateur
+   * ✅ Calcule le délai optimal basé sur le niveau utilisateur (augmenté pour sécurité)
    */
   private getOptimalDelay(): number {
     const tier = this.tier || 'free';
     
+    // ✅ Délais augmentés pour éviter de dépasser les limites
     switch (tier) {
       case 'free':
-        return 1200; // 1.2s pour Free (1 req/s)
+        return 0; // Pas de délai supplémentaire, le MIN_INTERVAL (1.5s) suffit
       case 'plus':
-        return 600;  // 0.6s pour Plus (2 req/s)
+        return 200;  // 0.2s supplémentaire pour Plus
       case 'prime':
-        return 300;  // 0.3s pour Prime (4 req/s)
+        return 100;  // 0.1s supplémentaire pour Prime
       case 'advanced':
-        return 200;  // 0.2s pour Advanced (6 req/s)
+        return 50;   // 0.05s supplémentaire pour Advanced
       default:
-        return 1200; // Par défaut, Free
+        return 0; // Par défaut, pas de délai supplémentaire
     }
   }
 
   /**
-   * Calcule le délai de retry après rate limit
+   * ✅ Calcule le délai de retry après rate limit (augmenté pour sécurité)
    */
   private getRetryDelay(): number {
     const tier = this.tier || 'free';
     
+    // ✅ Délais de retry augmentés pour éviter les erreurs répétées
     switch (tier) {
       case 'free':
-        return 15000; // 15s pour Free
+        return 20000; // ✅ 20s pour Free (au lieu de 15s)
       case 'plus':
         return 10000; // 10s pour Plus
       case 'prime':
@@ -353,13 +359,16 @@ export class CJAPIClient {
       const now = Date.now();
       const timeSinceLastRequest = now - CJAPIClient.globalLastRequestTime;
       
-      // Toujours respecter un minimum de 1.2 secondes entre requêtes (même pour les tiers supérieurs)
-      // pour éviter d'atteindre la limite de 1000 requêtes/jour
+      // ✅ Toujours respecter un minimum de 1.5 secondes entre requêtes
+      // pour garantir qu'on ne dépasse jamais la limite de 1 req/s
       const minInterval = CJAPIClient.MIN_INTERVAL;
 
       if (timeSinceLastRequest < minInterval) {
         const waitTime = minInterval - timeSinceLastRequest;
-        this.logger.log(`⏳ Rate limiting global: attente de ${waitTime}ms`);
+        // ✅ Log uniquement en dev ou si verbose activé
+        if (!this.isProduction || this.enableVerboseLogs) {
+          this.logger.debug(`⏳ Rate limiting: attente ${waitTime}ms`);
+        }
         await new Promise(resolve => setTimeout(resolve, waitTime));
       }
 
@@ -381,8 +390,10 @@ export class CJAPIClient {
     endpoint: string,
     data?: any
   ): Promise<CJResponse<T>> {
-    this.logger.log('🔍 === DÉBUT makeRequest ===');
-    this.logger.log('📝 Paramètres:', { method, endpoint, hasData: !!data });
+    // ✅ Logs verbeux uniquement en dev ou si explicitement activé
+    if (!this.isProduction || this.enableVerboseLogs) {
+      this.logger.debug(`🔍 ${method} ${endpoint}`);
+    }
     
     // Attendre que la queue soit vide avant de faire une nouvelle requête
     while (this.isProcessingQueue) {
@@ -391,22 +402,21 @@ export class CJAPIClient {
     
     // Gérer le rate limiting avec verrou global (garantit 1 requête/seconde max)
     await this.handleRateLimit();
-    this.logger.log('✅ Rate limiting géré (verrou global)');
 
     // ✅ Vérifier et charger le token depuis la base de données si nécessaire
     if (!this.accessToken || (this.tokenExpiry && new Date() >= this.tokenExpiry)) {
-      this.logger.log('🔄 Token expiré ou manquant, tentative de chargement depuis la base de données...');
+      if (!this.isProduction || this.enableVerboseLogs) {
+        this.logger.debug('🔄 Token expiré, rafraîchissement...');
+      }
       
       // Essayer de charger depuis la base de données
       const loaded = await this.loadTokenFromDatabase();
       
       if (!loaded) {
         // Si le token n'est pas en base ou est expiré, essayer de le rafraîchir
-        this.logger.log('🔄 Token non trouvé en base ou expiré, rafraîchissement...');
         await this.refreshAccessToken();
       }
     }
-    this.logger.log('✅ Token valide');
 
     const headers: any = {
       'CJ-Access-Token': this.accessToken,
@@ -416,12 +426,7 @@ export class CJAPIClient {
       headers['platformToken'] = this.config.platformToken;
     }
 
-    this.logger.log('📡 Headers configurés:', Object.keys(headers));
-    this.logger.log('🌐 URL complète:', `${this.baseURL}${endpoint}`);
-
     try {
-      this.logger.log('📡 Envoi de la requête...');
-      
       // ✅ Pour les requêtes GET, utiliser params au lieu de data pour les query parameters
       const requestConfig: any = {
         method,
@@ -437,34 +442,30 @@ export class CJAPIClient {
       
       const response = await this.axiosInstance.request(requestConfig);
 
-      this.logger.log('✅ Réponse reçue:', {
-        status: response.status,
-        statusText: response.statusText,
-        hasData: !!response.data,
-        dataType: typeof response.data
-      });
-      this.logger.log('🔍 === FIN makeRequest ===');
+      // ✅ Logs de succès uniquement en dev
+      if (!this.isProduction || this.enableVerboseLogs) {
+        this.logger.debug(`✅ ${method} ${endpoint} - ${response.status}`);
+      }
       
       // ✅ PAUSE INTELLIGENTE basée sur le niveau utilisateur
       const delay = this.getOptimalDelay();
-      this.logger.log(`⏳ Pause de ${delay}ms respectée (niveau: ${this.tier})`);
       await new Promise(resolve => setTimeout(resolve, delay));
       
       return response.data;
     } catch (error) {
-      this.logger.error('❌ === ERREUR makeRequest ===');
-      this.logger.error('💥 Erreur détaillée:', error);
-      this.logger.error('📊 Type d\'erreur:', typeof error);
-      this.logger.error('📊 Message d\'erreur:', error instanceof Error ? error.message : String(error));
-      
-      // Gérer l'erreur 429 (Too Many Requests) avec retry intelligent
+      // ✅ Gérer l'erreur 429 (Too Many Requests) avec retry silencieux
       if (error instanceof CJAPIError && (error.code === 429 || error.code === 1600200)) {
         const retryDelay = this.getRetryDelay();
-        this.logger.warn(`⏳ Rate limit atteint (${error.code}), attente de ${retryDelay}ms avant retry...`);
+        // ✅ Log uniquement en dev ou si verbose activé
+        if (!this.isProduction || this.enableVerboseLogs) {
+          this.logger.warn(`⏳ Rate limit atteint, retry dans ${retryDelay}ms...`);
+        }
         await new Promise(resolve => setTimeout(resolve, retryDelay));
         
-        this.logger.log('🔄 Retry après rate limit...');
         try {
+          // ✅ Réappliquer le rate limiting avant le retry
+          await this.handleRateLimit();
+          
           const retryConfig: any = {
             method,
             url: endpoint,
@@ -481,21 +482,33 @@ export class CJAPIClient {
           }
           
           const retryResponse = await this.axiosInstance.request(retryConfig);
-          this.logger.log('✅ Retry réussi après rate limit');
+          if (!this.isProduction || this.enableVerboseLogs) {
+            this.logger.debug('✅ Retry réussi');
+          }
           return retryResponse.data;
         } catch (retryError) {
-          this.logger.error('❌ Retry échoué après rate limit:', retryError);
+          // ✅ Log uniquement les erreurs critiques
+          this.logger.error(`❌ Erreur CJ API (${endpoint}): ${retryError instanceof Error ? retryError.message : String(retryError)}`);
           throw retryError;
         }
       }
       
+      // ✅ Log uniquement les erreurs critiques (pas d'authentification)
+      if (!(error instanceof CJAPIError && (error.code === 401 || error.code === 1600001 || error.code === 1600003))) {
+        this.logger.error(`❌ Erreur CJ API (${endpoint}): ${error instanceof Error ? error.message : String(error)}`);
+      }
+      
       // Gestion des erreurs d'authentification
       if (error instanceof CJAPIError && (error.code === 401 || error.code === 1600001 || error.code === 1600003)) {
-        this.logger.warn(`🔑 Erreur d'authentification (${error.code}), tentative de rafraîchissement...`);
+        if (!this.isProduction || this.enableVerboseLogs) {
+          this.logger.debug(`🔑 Auth error (${error.code}), refresh token...`);
+        }
         await this.refreshAccessToken();
         
+        // ✅ Réappliquer le rate limiting avant le retry
+        await this.handleRateLimit();
+        
         // Retry avec le nouveau token
-        this.logger.log('🔄 Retry avec nouveau token...');
         const retryConfig: any = {
           method,
           url: endpoint,
@@ -542,8 +555,10 @@ export class CJAPIClient {
     keyword?: string,
     options: CJProductSearchOptions = {}
   ): Promise<CJProductSearchResult> {
-    this.logger.log('🔍 === DÉBUT CLIENT API CJ searchProducts (V2) ===');
-    this.logger.log('📝 Paramètres reçus:', { keyword, options });
+    if (!this.isProduction || this.enableVerboseLogs) {
+      this.logger.debug('🔍 searchProducts (V2)');
+      this.logger.debug('📝 Paramètres:', { keyword, page: options.page || options.pageNum });
+    }
     
     try {
       await this.handleRateLimit();
@@ -641,7 +656,9 @@ export class CJAPIClient {
       // ✅ V2 endpoint
       const endpoint = `/product/listV2?${queryString.toString()}`;
       
-      this.logger.log(`📡 Endpoint V2: ${endpoint}`);
+      if (!this.isProduction || this.enableVerboseLogs) {
+        this.logger.debug(`📡 ${endpoint}`);
+      }
 
       const response = await this.makeRequest('GET', endpoint);
 
@@ -790,8 +807,12 @@ export class CJAPIClient {
    * Obtenir les détails complets d'un produit (selon doc CJ - endpoint /product/detail/{pid})
    */
   async getProductDetails(pid: string, includeVideo: boolean = true): Promise<CJProduct> {
-    this.logger.log('🔍 === DÉBUT getProductDetails ===');
-    this.logger.log('📝 PID:', pid);
+    if (!this.isProduction || this.enableVerboseLogs) {
+      this.logger.debug('🔍 getProductDetails');
+    }
+    if (!this.isProduction || this.enableVerboseLogs) {
+      this.logger.debug(`📝 PID: ${pid}`);
+    }
     
     try {
       // ✅ Utiliser l'endpoint /product/query qui fonctionne (pas /product/detail qui n'existe pas)
@@ -800,11 +821,15 @@ export class CJAPIClient {
       if (includeVideo) {
         endpoint += '&features=enable_video';
       }
-      this.logger.log('🌐 Endpoint final:', endpoint);
+      if (!this.isProduction || this.enableVerboseLogs) {
+        this.logger.debug(`🌐 ${endpoint}`);
+      }
       
       const response = await this.makeRequest('GET', endpoint);
       
-      this.logger.log('✅ Réponse API CJ reçue');
+      if (!this.isProduction || this.enableVerboseLogs) {
+        this.logger.debug('✅ Réponse API CJ reçue');
+      }
       
       // Vérifier si l'API retourne une erreur
       if (response.code !== 200 || !response.result) {
@@ -826,17 +851,20 @@ export class CJAPIClient {
         throw new Error(`Structure de produit invalide retournée par l'API CJ pour ${pid}`);
       }
       
-      this.logger.log(`✅ Produit récupéré: ${result.productNameEn || result.productName}`);
-      if (result.variants) {
-        this.logger.log(`📦 ${result.variants.length} variants trouvés dans les détails`);
+      if (!this.isProduction || this.enableVerboseLogs) {
+        this.logger.debug(`✅ Produit: ${result.productNameEn || result.productName}`);
+        if (result.variants) {
+          this.logger.debug(`📦 ${result.variants.length} variants`);
+        }
       }
-      this.logger.log('🔍 === FIN getProductDetails ===');
+      if (!this.isProduction || this.enableVerboseLogs) {
+        this.logger.debug('✅ getProductDetails terminé');
+      }
       
       return result;
     } catch (error) {
-      this.logger.error('❌ === ERREUR getProductDetails ===');
-      this.logger.error('💥 Erreur:', error instanceof Error ? error.message : String(error));
-      this.logger.error('🔍 === FIN ERREUR getProductDetails ===');
+      this.logger.error(`❌ Erreur getProductDetails (${pid}): ${error instanceof Error ? error.message : String(error)}`);
+      // Log déjà fait dans le catch, pas besoin de log supplémentaire
       throw error;
     }
   }
@@ -845,7 +873,9 @@ export class CJAPIClient {
    * Obtenir les variantes d'un produit
    */
   async getProductVariants(pid: string): Promise<CJVariant[]> {
-    this.logger.log(`🔍 Récupération variants pour produit ${pid}`);
+    if (!this.isProduction || this.enableVerboseLogs) {
+      this.logger.debug(`🔍 Récupération variants pour ${pid}`);
+    }
     const response = await this.makeRequest('GET', `/product/variant/query`, { params: { pid } });
     
     // makeRequest retourne response.data directement, qui peut être :
@@ -898,7 +928,9 @@ export class CJAPIClient {
    * @param vid Variant ID
    */
   async getVariantById(vid: string): Promise<CJVariant> {
-    this.logger.log(`🔍 Récupération variant par VID: ${vid}`);
+    if (!this.isProduction || this.enableVerboseLogs) {
+      this.logger.debug(`🔍 Récupération variant ${vid}`);
+    }
     
     try {
       await this.handleRateLimit();
@@ -1474,34 +1506,33 @@ export class CJAPIClient {
       }
     }
 
-    // 🔍 LOG DÉTAILLÉ AVANT ENVOI
-    this.logger.log('═══════════════════════════════════════════════════════');
-    this.logger.log('📤 ENVOI COMMANDE CJ - PAYLOAD COMPLET:');
-    this.logger.log('═══════════════════════════════════════════════════════');
-    this.logger.log(JSON.stringify(orderData, null, 2));
-    this.logger.log('═══════════════════════════════════════════════════════');
-    this.logger.log(`📦 Produits (${orderData.products.length}):`);
-    orderData.products.forEach((p, idx) => {
-      this.logger.log(`  ${idx + 1}. vid="${p.vid}" (type: ${typeof p.vid}, length: ${String(p.vid).length}), quantity=${p.quantity} (type: ${typeof p.quantity}), storeLineItemId="${p.storeLineItemId || 'N/A'}"`);
-    });
-    this.logger.log('═══════════════════════════════════════════════════════\n');
+    // ✅ Logs verbeux uniquement en dev ou si explicitement activé
+    if (!this.isProduction || this.enableVerboseLogs) {
+      this.logger.debug(`📤 Envoi commande CJ (${orderData.products.length} produits)`);
+    }
     
     const response = await this.makeRequest('POST', '/shopping/order/createOrderV3', orderData);
     
-    this.logger.log('📦 Réponse createOrderV3:', JSON.stringify(response, null, 2));
+    if (!this.isProduction || this.enableVerboseLogs) {
+      this.logger.debug('📦 Réponse createOrderV3 reçue');
+    }
     
     // L'API CJ retourne { code, result, message, data }
     // response est déjà response.data de makeRequest, donc on doit extraire data
     const responseAny = response as any;
     
     if (responseAny && responseAny.code === 200 && responseAny.data) {
-      this.logger.log('✅ Commande CJ créée avec succès (structure standard)');
+      if (!this.isProduction || this.enableVerboseLogs) {
+        this.logger.debug('✅ Commande CJ créée');
+      }
       return responseAny.data as any;
     }
     
     // Si la structure est différente, essayer directement
     if (responseAny && (responseAny.orderId || responseAny.orderNumber)) {
-      this.logger.log('✅ Commande CJ créée (structure directe)');
+      if (!this.isProduction || this.enableVerboseLogs) {
+        this.logger.debug('✅ Commande CJ créée');
+      }
       return responseAny as any;
     }
     
@@ -1511,7 +1542,7 @@ export class CJAPIClient {
       throw new Error(`Erreur création commande CJ: ${responseAny.message || 'Code erreur ' + responseAny.code}`);
     }
     
-    this.logger.error('❌ Structure de réponse inattendue:', JSON.stringify(response, null, 2));
+    this.logger.error('❌ Structure de réponse inattendue pour createOrderV3');
     throw new Error(`Erreur création commande CJ: ${responseAny?.message || 'Réponse invalide'}`);
   }
 
@@ -1524,7 +1555,9 @@ export class CJAPIClient {
     unInterceptAddressCount: number;
     interceptOrders: any[];
   }> {
-    this.logger.log(`🛒 Ajout de ${cjOrderIdList.length} commande(s) au panier CJ`);
+    if (!this.isProduction || this.enableVerboseLogs) {
+      this.logger.debug(`🛒 Ajout ${cjOrderIdList.length} commande(s) au panier`);
+    }
     const response = await this.makeRequest('POST', '/shopping/order/addCart', {
       cjOrderIdList,
     });
@@ -1555,7 +1588,9 @@ export class CJAPIClient {
     result: number;
     interceptOrders: any[];
   }> {
-    this.logger.log(`✅ Confirmation de ${cjOrderIdList.length} commande(s) dans le panier CJ`);
+    if (!this.isProduction || this.enableVerboseLogs) {
+      this.logger.debug(`✅ Confirmation ${cjOrderIdList.length} commande(s)`);
+    }
     const response = await this.makeRequest('POST', '/shopping/order/addCartConfirm', {
       cjOrderIdList,
     });
@@ -1630,7 +1665,9 @@ export class CJAPIClient {
       products,
     });
     
-    this.logger.log(`📦 Réponse API CJ - code: ${response.code}, result: ${response.result}, hasData: ${!!response.data}`);
+    if (!this.isProduction || this.enableVerboseLogs) {
+      this.logger.debug(`📦 Réponse API: ${response.code}`);
+    }
     this.logger.log(`📦 Structure réponse:`, JSON.stringify(response, null, 2).substring(0, 500));
     
     // La réponse de l'API CJ a la structure: { code, result, message, data: [...] }
@@ -1771,7 +1808,9 @@ export class CJAPIClient {
     hasVirPacked?: number;
     pageSize?: number;
   }): Promise<any[]> {
-    this.logger.log('📦 === RÉCUPÉRATION COMPLÈTE MY PRODUCTS (FAVORIS CJ) ===');
+    if (!this.isProduction || this.enableVerboseLogs) {
+      this.logger.debug('📦 Récupération favoris CJ');
+    }
     
     const pageSize = options?.pageSize || 100; // Max 100 par page
     let allProducts: any[] = [];
@@ -1809,7 +1848,9 @@ export class CJAPIClient {
         
         const endpoint = `/product/myProduct/query?${queryString.toString()}`;
         
-        this.logger.log(`📡 Endpoint: ${endpoint}`);
+        if (!this.isProduction || this.enableVerboseLogs) {
+          this.logger.debug(`📡 ${endpoint}`);
+        }
         
         const response = await this.makeRequest('GET', endpoint);
         
@@ -1923,7 +1964,9 @@ export class CJAPIClient {
    * Récupérer toutes les catégories
    */
   async getCategories(): Promise<any[]> {
-    this.logger.log('🏷️ Récupération des catégories CJ...');
+    if (!this.isProduction || this.enableVerboseLogs) {
+      this.logger.debug('🏷️ Récupération catégories CJ');
+    }
     
     try {
       const response = await this.makeRequest('GET', '/product/getCategory');
