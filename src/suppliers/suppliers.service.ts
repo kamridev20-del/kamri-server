@@ -233,12 +233,11 @@ export class SuppliersService {
       try {
         console.log('🛒 === IMPORT EN LOT DEPUIS LE MAGASIN CJ ===');
         
-        // ✅ Récupérer uniquement les produits disponibles qui n'ont PAS encore été importés
-        // Vérifier d'abord quels produits sont déjà dans Product (par cjProductId, sans filtrer par supplierId car certains peuvent ne pas avoir le bon supplierId)
+        // ✅ Vérifier d'abord quels produits sont déjà dans Product (pour éviter de remettre en 'available' ceux déjà importés)
         const existingProducts = await this.prisma.product.findMany({
           where: {
             cjProductId: { not: null },
-            source: 'cj-dropshipping' // Seulement les produits CJ
+            source: 'cj-dropshipping'
           },
           select: { cjProductId: true }
         });
@@ -250,33 +249,12 @@ export class SuppliersService {
         );
         
         console.log(`🔍 ${existingCJProductIds.size} produits déjà importés détectés dans Product`);
-        
-        // Récupérer tous les produits disponibles du magasin
-        const allAvailableProducts = await this.prisma.cJProductStore.findMany({
-          where: { 
-            status: 'available'
-          },
+
+        // Récupérer tous les produits disponibles du magasin CJ
+        let cjStoreProducts = await this.prisma.cJProductStore.findMany({
+          where: { status: 'available' },
           orderBy: { createdAt: 'desc' }
         });
-        
-        console.log(`📦 ${allAvailableProducts.length} produits 'available' dans le magasin CJ`);
-        
-        // Filtrer manuellement pour exclure ceux déjà importés
-        // ✅ Inclure les produits sans cjProductId (peuvent être importés)
-        // ✅ Exclure seulement ceux qui ont un cjProductId ET qui sont déjà dans Product
-        const cjStoreProducts = allAvailableProducts.filter(
-          p => {
-            // Si pas de cjProductId, inclure (peut être importé)
-            if (!p.cjProductId || p.cjProductId.trim() === '') {
-              console.log(`ℹ️ Produit ${p.id} (${p.name}) n'a pas de cjProductId - sera inclus`);
-              return true;
-            }
-            // Si a un cjProductId, vérifier s'il n'est pas déjà importé
-            return !existingCJProductIds.has(p.cjProductId);
-          }
-        );
-        
-        console.log(`✅ ${cjStoreProducts.length} produits disponibles à importer (${allAvailableProducts.length - cjStoreProducts.length} déjà importés exclus)`);
 
         // ✅ DEBUG : Vérifier tous les produits du magasin
         const allCJProducts = await this.prisma.cJProductStore.findMany({
@@ -285,138 +263,69 @@ export class SuppliersService {
         console.log(`🔍 DEBUG - Tous les produits du magasin CJ:`, allCJProducts.map(p => ({ 
           id: p.id, 
           name: p.name, 
-          status: p.status,
-          cjProductId: p.cjProductId
+          status: p.status 
         })));
 
-        // ✅ IMPORTANT : Si aucun produit disponible, vérifier s'il y a des produits 'imported' qui ne sont pas dans Product
-        // Cette vérification doit se faire AVANT de retourner l'erreur
+        // Filtrer les produits disponibles pour exclure ceux déjà importés
+        cjStoreProducts = cjStoreProducts.filter(p => {
+          // Si pas de cjProductId, inclure (peut être importé)
+          if (!p.cjProductId || p.cjProductId.trim() === '') return true;
+          // Si a un cjProductId, vérifier qu'il n'est pas déjà dans Product
+          return !existingCJProductIds.has(p.cjProductId);
+        });
+
         if (cjStoreProducts.length === 0) {
-          // ✅ Vérifier s'il y a des produits avec status 'imported' qui ne sont pas dans Product
-          // Inclure les produits sans cjProductId OU ceux qui ont un cjProductId mais ne sont pas dans Product
-          const allImportedProducts = allCJProducts.filter(p => p.status === 'imported');
-          console.log(`🔍 DEBUG - Analyse des produits 'imported': ${allImportedProducts.length} produits trouvés`);
+          // ✅ Si aucun produit disponible, vérifier s'il y a des produits 'imported' qui ne sont PAS dans Product
+          const importedProducts = allCJProducts.filter(p => p.status === 'imported');
           
-          const importedButNotInProduct = allImportedProducts.filter(
-            p => {
+          if (importedProducts.length > 0) {
+            // Filtrer pour ne garder que ceux qui ne sont PAS dans Product
+            const importedButNotInProduct = importedProducts.filter(p => {
               // Si pas de cjProductId, on peut le remettre en available
-              if (!p.cjProductId || p.cjProductId.trim() === '') {
-                console.log(`   ✅ Produit 'imported' sans cjProductId: ${p.id} (${p.name}) - sera remis en 'available'`);
-                return true;
-              }
+              if (!p.cjProductId || p.cjProductId.trim() === '') return true;
               // Si a un cjProductId, vérifier qu'il n'est pas dans Product
-              const isInProduct = existingCJProductIds.has(p.cjProductId);
-              if (!isInProduct) {
-                console.log(`   ✅ Produit 'imported' non trouvé dans Product: ${p.id} (${p.name}) - cjProductId: ${p.cjProductId} - sera remis en 'available'`);
-              } else {
-                console.log(`   ❌ Produit 'imported' déjà dans Product: ${p.id} (${p.name}) - cjProductId: ${p.cjProductId}`);
-              }
-              return !isInProduct;
-            }
-          );
-          
-          console.log(`🔍 DEBUG - Produits 'imported' à remettre en 'available': ${importedButNotInProduct.length} sur ${allImportedProducts.length}`);
-          
-          if (importedButNotInProduct.length > 0) {
-            console.log(`🔄 ${importedButNotInProduct.length} produits marqués 'imported' mais absents de Product - Remise en 'available'`);
-            const updateResult = await this.prisma.cJProductStore.updateMany({
-              where: { 
-                id: { in: importedButNotInProduct.map(p => p.id) }
-              },
-              data: { status: 'available' }
-            });
-            console.log(`✅ ${updateResult.count} produits mis à jour avec succès`);
-            
-            // Récupérer à nouveau tous les produits disponibles et filtrer manuellement
-            const allNewAvailableProducts = await this.prisma.cJProductStore.findMany({
-              where: { 
-                status: 'available'
-              },
-              orderBy: { createdAt: 'desc' }
+              return !existingCJProductIds.has(p.cjProductId);
             });
             
-            console.log(`📦 ${allNewAvailableProducts.length} produits maintenant 'available' après remise en statut`);
-            
-            // Filtrer manuellement pour exclure ceux déjà importés
-            const newCJStoreProducts = allNewAvailableProducts.filter(
-              p => {
-                if (!p.cjProductId || p.cjProductId.trim() === '') {
-                  return true; // Inclure les produits sans cjProductId
-                }
+            if (importedButNotInProduct.length > 0) {
+              console.log(`🔄 Remise en statut 'available' de ${importedButNotInProduct.length} produits importés (sur ${importedProducts.length} total) qui ne sont pas dans Product`);
+              await this.prisma.cJProductStore.updateMany({
+                where: { 
+                  id: { in: importedButNotInProduct.map(p => p.id) }
+                },
+                data: { status: 'available' }
+              });
+              
+              // Récupérer à nouveau les produits maintenant disponibles
+              const newCJStoreProducts = await this.prisma.cJProductStore.findMany({
+                where: { status: 'available' },
+                orderBy: { createdAt: 'desc' }
+              });
+              
+              // Filtrer à nouveau pour exclure ceux déjà importés
+              cjStoreProducts = newCJStoreProducts.filter(p => {
+                if (!p.cjProductId || p.cjProductId.trim() === '') return true;
                 return !existingCJProductIds.has(p.cjProductId);
+              });
+              
+              if (cjStoreProducts.length > 0) {
+                console.log(`✅ ${cjStoreProducts.length} produits remis en statut 'available' et prêts à importer`);
+              } else {
+                console.log(`⚠️ Aucun produit disponible après remise en statut (tous déjà importés)`);
               }
-            );
-            
-            console.log(`✅ ${newCJStoreProducts.length} produits disponibles à importer après filtrage`);
-            
-            if (newCJStoreProducts.length > 0) {
-              console.log(`✅ ${newCJStoreProducts.length} produits remis en statut 'available' et prêts à importer`);
-              // Remplacer cjStoreProducts avec les nouveaux produits
-              cjStoreProducts.length = 0; // Vider le tableau
-              cjStoreProducts.push(...newCJStoreProducts);
             } else {
-              console.log(`⚠️ Aucun produit disponible après remise en statut et filtrage`);
+              console.log(`ℹ️ ${importedProducts.length} produits 'imported' trouvés, mais tous sont déjà dans Product`);
             }
-          } else {
-            console.log(`⚠️ Aucun produit 'imported' trouvé qui ne soit pas dans Product. Tous les ${allImportedProducts.length} produits 'imported' sont déjà dans Product.`);
-          }
-          
-          // ✅ Vérifier s'il y a des produits disponibles mais déjà importés
-          const availableButImported = allCJProducts.filter(
-            p => p.status === 'available' && p.cjProductId && existingCJProductIds.has(p.cjProductId)
-          );
-          
-          if (availableButImported.length > 0) {
-            console.log(`ℹ️ ${availableButImported.length} produits sont 'available' mais déjà importés dans Product`);
-          }
-          
-          // ✅ DEBUG : Log détaillé pour comprendre le problème
-          if (cjStoreProducts.length === 0 && allAvailableProducts.length > 0) {
-            console.log(`🔍 DEBUG - Analyse des produits exclus:`);
-            allAvailableProducts.forEach(p => {
-              if (p.cjProductId && existingCJProductIds.has(p.cjProductId)) {
-                console.log(`   - ${p.name} (${p.cjProductId}) : DÉJÀ IMPORTÉ`);
-              } else if (!p.cjProductId || p.cjProductId.trim() === '') {
-                console.log(`   - ${p.name} : PAS DE CJPRODUCTID`);
-              }
-            });
           }
           
           if (cjStoreProducts.length === 0) {
             const availableCount = allCJProducts.filter(p => p.status === 'available').length;
             const importedCount = allCJProducts.filter(p => p.status === 'imported').length;
-            const availableButImportedCount = allCJProducts.filter(
-              p => p.status === 'available' && p.cjProductId && existingCJProductIds.has(p.cjProductId)
-            ).length;
-            const availableWithoutCJId = allCJProducts.filter(
-              p => p.status === 'available' && (!p.cjProductId || p.cjProductId.trim() === '')
-            ).length;
-            
-            console.log(`🔍 DEBUG - Analyse complète:`);
-            console.log(`   - Total produits dans magasin: ${allCJProducts.length}`);
-            console.log(`   - Produits 'available': ${availableCount}`);
-            console.log(`   - Produits 'imported': ${importedCount}`);
-            console.log(`   - Produits 'available' mais déjà importés: ${availableButImportedCount}`);
-            console.log(`   - Produits 'available' sans cjProductId: ${availableWithoutCJId}`);
-            console.log(`   - Produits déjà dans Product: ${existingCJProductIds.size}`);
-            
-            // Si tous les produits disponibles sont déjà importés
-            if (availableCount > 0 && availableButImportedCount === availableCount) {
-              return {
-                message: `Tous les ${availableCount} produits 'available' ont déjà été importés dans Product. Pour réimporter, supprimez-les de Product ou importez de nouveaux produits depuis /admin/cj-dropshipping/products`,
-                products: [],
-                supplier: 'CJ Dropshipping',
-                workflow: 'Tous les produits disponibles ont déjà été importés'
-              };
-            }
-            
             return {
-              message: `Aucun produit disponible à importer. ${availableCount} produits 'available' dans le magasin, ${existingCJProductIds.size} déjà importés dans Product, ${importedCount} produits marqués 'imported'. ${availableWithoutCJId > 0 ? `${availableWithoutCJId} produits sans cjProductId.` : ''}`,
+              message: `Aucun produit disponible à importer. ${availableCount} produits 'available' dans le magasin, ${existingCJProductIds.size} déjà importés dans Product, ${importedCount} produits marqués 'imported'. Tous les produits disponibles ont déjà été importés.`,
               products: [],
               supplier: 'CJ Dropshipping',
-              workflow: availableCount === 0 
-                ? 'Aucun produit disponible dans le magasin. Importez d\'abord des produits depuis /admin/cj-dropshipping/products'
-                : 'Tous les produits disponibles ont déjà été importés. Importez de nouveaux produits depuis /admin/cj-dropshipping/products'
+              workflow: 'Tous les produits disponibles ont déjà été importés. Importez de nouveaux produits depuis /admin/cj-dropshipping/products'
             };
           }
         }
