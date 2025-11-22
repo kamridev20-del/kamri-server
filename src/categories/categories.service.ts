@@ -7,7 +7,21 @@ export class CategoriesService {
 
   async findAll() {
     return this.prisma.category.findMany({
-      include: {
+      select: {
+        id: true,
+        name: true,
+        nameEn: true,
+        description: true,
+        icon: true,
+        color: true,
+        externalId: true,
+        parentId: true,
+        level: true,
+        isActive: true,
+        isDefault: true,
+        createdAt: true,
+        updatedAt: true,
+        // imageUrl: true, // ❌ Exclu temporairement jusqu'à migration
         products: {
           where: {
             status: {
@@ -32,8 +46,24 @@ export class CategoriesService {
    * Utilise une seule requête SQL avec GROUP BY au lieu de charger tous les produits
    */
   async findAllWithProductCounts() {
-    // Récupérer les catégories
+    // Récupérer les catégories (sans imageUrl pour éviter l'erreur si la colonne n'existe pas encore)
     const categories = await this.prisma.category.findMany({
+      select: {
+        id: true,
+        name: true,
+        nameEn: true,
+        description: true,
+        icon: true,
+        color: true,
+        externalId: true,
+        parentId: true,
+        level: true,
+        isActive: true,
+        isDefault: true,
+        createdAt: true,
+        updatedAt: true,
+        // imageUrl: true, // ❌ Exclu temporairement jusqu'à migration
+      },
       orderBy: { name: 'asc' }
     });
 
@@ -70,8 +100,24 @@ export class CategoriesService {
    * Pour la page admin - évite les appels API séquentiels
    */
   async getAllCategoryStats() {
-    // Récupérer toutes les catégories
+    // Récupérer toutes les catégories (sans imageUrl pour éviter l'erreur si la colonne n'existe pas encore)
     const categories = await this.prisma.category.findMany({
+      select: {
+        id: true,
+        name: true,
+        nameEn: true,
+        description: true,
+        icon: true,
+        color: true,
+        externalId: true,
+        parentId: true,
+        level: true,
+        isActive: true,
+        isDefault: true,
+        createdAt: true,
+        updatedAt: true,
+        // imageUrl: true, // ❌ Exclu temporairement jusqu'à migration
+      },
       orderBy: { name: 'asc' }
     });
 

@@ -28,7 +28,25 @@ export class SuppliersService {
       include: {
         products: {
           include: {
-            category: true,
+            category: {
+              // ✅ Spécifier explicitement les champs pour éviter imageUrl qui n'existe pas encore
+              select: {
+                id: true,
+                name: true,
+                nameEn: true,
+                description: true,
+                icon: true,
+                color: true,
+                externalId: true,
+                parentId: true,
+                level: true,
+                isActive: true,
+                isDefault: true,
+                createdAt: true,
+                updatedAt: true,
+                // imageUrl: true, // ❌ Exclu temporairement jusqu'à migration
+              }
+            },
             supplier: true,
             productVariants: {
               // ✅ Inclure les variants avec leurs stocks
