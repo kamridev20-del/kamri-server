@@ -43,7 +43,7 @@ export class CategoriesController {
   @Post()
   @ApiOperation({ summary: 'Créer une nouvelle catégorie' })
   @ApiResponse({ status: 201, description: 'Catégorie créée avec succès' })
-  async create(@Body() data: { name: string; description?: string; icon?: string; color?: string }) {
+  async create(@Body() data: { name: string; description?: string; icon?: string; color?: string; imageUrl?: string }) {
     const category = await this.categoriesService.create(data);
     return {
       data: category,
@@ -223,7 +223,7 @@ export class CategoriesController {
   @ApiOperation({ summary: 'Modifier une catégorie' })
   @ApiResponse({ status: 200, description: 'Catégorie modifiée avec succès' })
   @ApiResponse({ status: 404, description: 'Catégorie non trouvée' })
-  async update(@Param('id') id: string, @Body() data: { name?: string; description?: string; icon?: string; color?: string }) {
+  async update(@Param('id') id: string, @Body() data: { name?: string; description?: string; icon?: string; color?: string; imageUrl?: string }) {
     const category = await this.categoriesService.update(id, data);
     if (!category) {
       return {
@@ -233,6 +233,18 @@ export class CategoriesController {
     return {
       data: category,
       message: 'Catégorie modifiée avec succès'
+    };
+  }
+
+  @Post(':id/upload-image')
+  @ApiOperation({ summary: 'Uploader une image pour une catégorie (redirection vers /api/upload/categories/:id/image)' })
+  @ApiResponse({ status: 200, description: 'Image uploadée avec succès' })
+  async uploadImage(@Param('id') id: string) {
+    // Cette route redirige vers le module upload
+    // L'implémentation réelle est dans UploadController
+    return {
+      message: 'Utilisez POST /api/upload/categories/:id/image pour uploader une image',
+      endpoint: `/api/upload/categories/${id}/image`
     };
   }
 

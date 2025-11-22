@@ -43,6 +43,7 @@ model Category {
   description String?
   icon        String?  @default("🛍️")
   color       String?  @default("#4CAF50")
+  imageUrl    String?  // ✅ URL de l'image personnalisée pour la catégorie
   externalId  String? // ID externe (CJ, etc.)
   parentId    String? // ID parent pour hiérarchie
   level       Int? // Niveau dans la hiérarchie

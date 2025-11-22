@@ -163,19 +163,20 @@ export class CategoriesService {
     });
   }
 
-  async create(data: { name: string; description?: string; icon?: string; color?: string }) {
+  async create(data: { name: string; description?: string; icon?: string; color?: string; imageUrl?: string }) {
     return this.prisma.category.create({
       data: {
         name: data.name,
         description: data.description || '',
         icon: data.icon || '🛍️',
         color: data.color || '#4CAF50',
+        imageUrl: data.imageUrl,
         isDefault: false // ✅ S'assurer que les nouvelles catégories ne sont pas par défaut
       }
     });
   }
 
-  async update(id: string, data: { name?: string; description?: string; icon?: string; color?: string }) {
+  async update(id: string, data: { name?: string; description?: string; icon?: string; color?: string; imageUrl?: string }) {
     return this.prisma.category.update({
       where: { id },
       data

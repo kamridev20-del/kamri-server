@@ -18,6 +18,7 @@ import { SettingsModule } from './settings/settings.module';
 import { ShippingModule } from './shipping/shipping.module';
 import { StoresModule } from './stores/stores.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
+import { UploadModule } from './upload/upload.module';
 import { UserSettingsModule } from './user-settings/user-settings.module';
 import { UsersModule } from './users/users.module';
 import { WishlistModule } from './wishlist/wishlist.module';
@@ -66,6 +67,7 @@ import { WishlistModule } from './wishlist/wishlist.module';
     StoresModule,
     GeoModule, // ✅ Module géolocalisation
     ShippingModule, // ✅ Module validation livraison
+    UploadModule, // ✅ Module upload d'images
   ],
 })
 export class AppModule {}
