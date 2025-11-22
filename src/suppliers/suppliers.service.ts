@@ -29,7 +29,7 @@ export class SuppliersService {
         products: {
           include: {
             category: {
-              // ✅ Spécifier explicitement les champs pour éviter imageUrl qui n'existe pas encore
+              // ✅ Inclure tous les champs de la catégorie, y compris imageUrl
               select: {
                 id: true,
                 name: true,
@@ -37,6 +37,7 @@ export class SuppliersService {
                 description: true,
                 icon: true,
                 color: true,
+                imageUrl: true, // ✅ URL de l'image personnalisée
                 externalId: true,
                 parentId: true,
                 level: true,
@@ -44,7 +45,6 @@ export class SuppliersService {
                 isDefault: true,
                 createdAt: true,
                 updatedAt: true,
-                // imageUrl: true, // ❌ Exclu temporairement jusqu'à migration
               }
             },
             supplier: true,

@@ -21,7 +21,7 @@ export class CategoriesService {
         isDefault: true,
         createdAt: true,
         updatedAt: true,
-        // imageUrl: true, // ❌ Exclu temporairement jusqu'à migration
+        imageUrl: true, // ✅ URL de l'image personnalisée
         products: {
           where: {
             status: {
@@ -46,7 +46,7 @@ export class CategoriesService {
    * Utilise une seule requête SQL avec GROUP BY au lieu de charger tous les produits
    */
   async findAllWithProductCounts() {
-    // Récupérer les catégories (sans imageUrl pour éviter l'erreur si la colonne n'existe pas encore)
+    // Récupérer les catégories
     const categories = await this.prisma.category.findMany({
       select: {
         id: true,
@@ -62,7 +62,7 @@ export class CategoriesService {
         isDefault: true,
         createdAt: true,
         updatedAt: true,
-        // imageUrl: true, // ❌ Exclu temporairement jusqu'à migration
+        imageUrl: true, // ✅ URL de l'image personnalisée
       },
       orderBy: { name: 'asc' }
     });
@@ -100,7 +100,7 @@ export class CategoriesService {
    * Pour la page admin - évite les appels API séquentiels
    */
   async getAllCategoryStats() {
-    // Récupérer toutes les catégories (sans imageUrl pour éviter l'erreur si la colonne n'existe pas encore)
+    // Récupérer toutes les catégories
     const categories = await this.prisma.category.findMany({
       select: {
         id: true,
@@ -109,6 +109,7 @@ export class CategoriesService {
         description: true,
         icon: true,
         color: true,
+        imageUrl: true, // ✅ URL de l'image personnalisée
         externalId: true,
         parentId: true,
         level: true,
@@ -116,7 +117,6 @@ export class CategoriesService {
         isDefault: true,
         createdAt: true,
         updatedAt: true,
-        // imageUrl: true, // ❌ Exclu temporairement jusqu'à migration
       },
       orderBy: { name: 'asc' }
     });
