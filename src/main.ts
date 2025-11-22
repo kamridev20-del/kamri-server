@@ -9,20 +9,38 @@ async function bootstrap() {
     rawBody: true, // ✅ Activer le raw body pour les webhooks Stripe
   });
 
-  // Configuration CORS - Simplifié pour le développement
+  // Configuration CORS
   const isProduction = process.env.NODE_ENV === 'production';
   
   if (isProduction) {
     // Production : Utiliser les variables d'environnement
     const allowedOrigins: string[] = [];
-    if (process.env.FRONTEND_URL) allowedOrigins.push(process.env.FRONTEND_URL);
-    if (process.env.ADMIN_URL) allowedOrigins.push(process.env.ADMIN_URL);
+    if (process.env.FRONTEND_URL) {
+      allowedOrigins.push(process.env.FRONTEND_URL);
+      // Ajouter aussi sans trailing slash
+      if (process.env.FRONTEND_URL.endsWith('/')) {
+        allowedOrigins.push(process.env.FRONTEND_URL.slice(0, -1));
+      } else {
+        allowedOrigins.push(process.env.FRONTEND_URL + '/');
+      }
+    }
+    if (process.env.ADMIN_URL) {
+      allowedOrigins.push(process.env.ADMIN_URL);
+      // Ajouter aussi sans trailing slash
+      if (process.env.ADMIN_URL.endsWith('/')) {
+        allowedOrigins.push(process.env.ADMIN_URL.slice(0, -1));
+      } else {
+        allowedOrigins.push(process.env.ADMIN_URL + '/');
+      }
+    }
     if (process.env.ALLOWED_ORIGINS) {
       allowedOrigins.push(...process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()));
     }
     
+    console.log('🌐 [CORS] Allowed origins:', allowedOrigins);
+    
     app.enableCors({
-      origin: allowedOrigins.length > 0 ? allowedOrigins : false,
+      origin: allowedOrigins.length > 0 ? allowedOrigins : true, // Autoriser toutes les origines si aucune configurée
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization'],
