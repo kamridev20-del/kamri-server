@@ -27,6 +27,129 @@ export class CategoriesService {
     });
   }
 
+  /**
+   * ✅ OPTIMISÉ : Récupérer toutes les catégories avec le nombre de produits
+   * Utilise une seule requête SQL avec GROUP BY au lieu de charger tous les produits
+   */
+  async findAllWithProductCounts() {
+    // Récupérer les catégories
+    const categories = await this.prisma.category.findMany({
+      orderBy: { name: 'asc' }
+    });
+
+    // ✅ Une seule requête SQL pour compter les produits par catégorie
+    const productCounts = await this.prisma.product.groupBy({
+      by: ['categoryId'],
+      where: {
+        status: {
+          in: ['active', 'pending']
+        },
+        categoryId: {
+          not: null
+        }
+      },
+      _count: {
+        id: true
+      }
+    });
+
+    // Créer un Map pour un accès rapide
+    const countMap = new Map(
+      productCounts.map(item => [item.categoryId, item._count.id])
+    );
+
+    // Enrichir les catégories avec les compteurs
+    return categories.map(category => ({
+      ...category,
+      productCount: countMap.get(category.id) || 0
+    }));
+  }
+
+  /**
+   * ✅ OPTIMISÉ : Récupérer toutes les statistiques de catégories en une seule requête
+   * Pour la page admin - évite les appels API séquentiels
+   */
+  async getAllCategoryStats() {
+    // Récupérer toutes les catégories
+    const categories = await this.prisma.category.findMany({
+      orderBy: { name: 'asc' }
+    });
+
+    // ✅ Une seule requête pour compter les produits draft par catégorie
+    const draftCounts = await this.prisma.product.groupBy({
+      by: ['categoryId'],
+      where: {
+        status: 'draft',
+        categoryId: {
+          not: null
+        }
+      },
+      _count: {
+        id: true
+      }
+    });
+
+    // ✅ Récupérer tous les mappings
+    const mappings = await this.prisma.categoryMapping.findMany({
+      include: {
+        supplier: true
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    // ✅ Compter les produits CJ par catégorie externe en une seule requête
+    const cjStoreCounts = await this.prisma.cJProductStore.groupBy({
+      by: ['category'],
+      where: {
+        status: 'available'
+      },
+      _count: {
+        id: true
+      }
+    });
+
+    // Créer des Maps pour un accès rapide
+    const draftCountMap = new Map(
+      draftCounts.map(item => [item.categoryId, item._count.id])
+    );
+
+    const cjStoreCountMap = new Map(
+      cjStoreCounts.map(item => [item.category, item._count.id])
+    );
+
+    // Construire les statistiques
+    const categoryStats: Record<string, { draftCount: number; cjStoreCount: number }> = {};
+
+    // Stats pour les catégories
+    categories.forEach(category => {
+      categoryStats[category.id] = {
+        draftCount: draftCountMap.get(category.id) || 0,
+        cjStoreCount: 0
+      };
+    });
+
+    // Stats pour les mappings (CJ Store)
+    mappings.forEach(mapping => {
+      const cjCount = cjStoreCountMap.get(mapping.externalCategory) || 0;
+      if (categoryStats[mapping.internalCategory]) {
+        categoryStats[mapping.internalCategory].cjStoreCount += cjCount;
+      } else {
+        categoryStats[mapping.internalCategory] = {
+          draftCount: 0,
+          cjStoreCount: cjCount
+        };
+      }
+    });
+
+    return {
+      categories,
+      mappings,
+      stats: categoryStats
+    };
+  }
+
   async findOne(id: string) {
     return this.prisma.category.findUnique({
       where: { id },

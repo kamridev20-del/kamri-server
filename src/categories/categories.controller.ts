@@ -18,6 +18,28 @@ export class CategoriesController {
     };
   }
 
+  @Get('with-product-counts')
+  @ApiOperation({ summary: 'Récupérer toutes les catégories avec le nombre de produits par catégorie (optimisé)' })
+  @ApiResponse({ status: 200, description: 'Catégories avec compteurs récupérées avec succès' })
+  async findAllWithProductCounts() {
+    const categories = await this.categoriesService.findAllWithProductCounts();
+    return {
+      data: categories,
+      message: 'Catégories avec compteurs récupérées avec succès'
+    };
+  }
+
+  @Get('stats/all')
+  @ApiOperation({ summary: 'Récupérer toutes les statistiques de catégories en une seule requête (optimisé pour admin)' })
+  @ApiResponse({ status: 200, description: 'Statistiques récupérées avec succès' })
+  async getAllCategoryStats() {
+    const stats = await this.categoriesService.getAllCategoryStats();
+    return {
+      data: stats,
+      message: 'Statistiques récupérées avec succès'
+    };
+  }
+
   @Post()
   @ApiOperation({ summary: 'Créer une nouvelle catégorie' })
   @ApiResponse({ status: 201, description: 'Catégorie créée avec succès' })
