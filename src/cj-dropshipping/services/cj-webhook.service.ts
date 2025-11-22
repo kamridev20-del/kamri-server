@@ -245,20 +245,7 @@ export class CJWebhookService {
             this.logger.warn(`⚠️ Erreur parsing variants:`, e);
           }
 
-          // Trouver la catégorie mappée
-          let categoryId = null;
-          if (cjStoreProduct.category) {
-            const categoryMapping = await this.prisma.categoryMapping.findFirst({
-              where: {
-                externalCategory: cjStoreProduct.category
-              }
-            });
-            if (categoryMapping) {
-              categoryId = categoryMapping.internalCategory;
-            }
-          }
-
-          // Trouver le fournisseur
+          // Trouver le fournisseur d'abord (nécessaire pour le mapping de catégorie)
           let supplierId = null;
           const supplier = await this.prisma.supplier.findFirst({
             where: {
@@ -268,6 +255,54 @@ export class CJWebhookService {
           if (supplier) {
             supplierId = supplier.id;
           }
+
+          // Trouver la catégorie mappée (avec supplierId pour correspondre à la logique de mapExternalCategory)
+          let categoryId = null;
+          if (cjStoreProduct.category && supplierId) {
+            const categoryMapping = await this.prisma.categoryMapping.findFirst({
+              where: {
+                supplierId: supplierId, // ✅ Ajouter supplierId pour correspondre à mapExternalCategory
+                externalCategory: cjStoreProduct.category
+              }
+            });
+            if (categoryMapping) {
+              // Vérifier si la catégorie interne existe
+              const category = await this.prisma.category.findUnique({
+                where: { id: categoryMapping.internalCategory }
+              });
+              if (category) {
+                categoryId = category.id;
+                this.logger.log(`✅ Catégorie mappée: ${cjStoreProduct.category} → ${category.name} (ID: ${categoryId})`);
+              } else {
+                this.logger.warn(`⚠️ Catégorie interne non trouvée pour ID: ${categoryMapping.internalCategory}`);
+              }
+            } else {
+              this.logger.warn(`⚠️ Aucun mapping trouvé pour catégorie externe: ${cjStoreProduct.category}`);
+            }
+          }
+
+          // ✅ Récupérer les stocks en temps réel depuis l'API CJ (comme dans prepareCJProductForPublication)
+          let variantsWithStock: any[] = [];
+          if (pid) {
+            try {
+              this.logger.log(`📡 Récupération des stocks pour PID: ${pid}`);
+              await this.cjApiClient.loadTokenFromDatabase();
+              variantsWithStock = await this.cjApiClient.getProductVariantsWithStock(pid);
+              this.logger.log(`✅ ${variantsWithStock.length} variants avec stocks récupérés depuis l'API CJ`);
+            } catch (stockError) {
+              this.logger.warn(`⚠️ Impossible de récupérer les stocks depuis l'API CJ:`, stockError instanceof Error ? stockError.message : stockError);
+              // Fallback : utiliser les variants depuis CJProductStore
+            }
+          }
+
+          // Utiliser les variants avec stocks si disponibles, sinon fallback sur les variants JSON
+          const variantsToUse = variantsWithStock.length > 0 ? variantsWithStock : variants;
+
+          // ✅ Calculer le stock total depuis les variants avant création
+          const totalStock = variantsToUse.reduce((sum, v) => {
+            const stockValue = parseInt(v.stock || v.variantStock || '0', 10);
+            return sum + stockValue;
+          }, 0);
 
           // Créer le produit dans Product (draft)
           existingProduct = await this.prisma.product.create({
@@ -282,7 +317,7 @@ export class CJWebhookService {
               externalCategory: cjStoreProduct.category,
               source: 'cj-dropshipping',
               status: 'draft',
-              stock: 0,
+              stock: totalStock, // ✅ Stock total calculé depuis les variants
               cjProductId: pid,
               productSku: cjStoreProduct.productSku,
               variants: cjStoreProduct.variants,
@@ -292,33 +327,37 @@ export class CJWebhookService {
                   cjSku: cjStoreProduct.productSku || pid
                 }
               },
-              // Créer les variants comme ProductVariant
+              // Créer les variants comme ProductVariant avec stocks depuis l'API CJ
               productVariants: {
-                create: variants.map((v: any) => {
+                create: variantsToUse.map((v: any) => {
                   // ✅ Convertir status en String si c'est un nombre
                   const variantStatus = v.variantStatus !== null && v.variantStatus !== undefined
                     ? (typeof v.variantStatus === 'number' ? String(v.variantStatus) : v.variantStatus)
                     : null;
                   
+                  // ✅ Récupérer le stock (priorité : stock depuis API CJ > variantStock > stock JSON)
+                  const stockValue = parseInt(v.stock || v.variantStock || '0', 10);
+                  
                   return {
-                    name: v.variantName || v.variantNameEn || '',
-                    sku: v.variantSku || '',
-                    price: parseFloat(v.sellPrice || v.variantSellPrice || '0'),
-                    weight: v.variantWeight || 0,
-                    dimensions: v.variantLength || v.variantWidth || v.variantHeight ? 
+                    name: v.variantNameEn || v.variantName || v.name || '',
+                    sku: v.variantSku || v.sku || '',
+                    price: parseFloat(v.variantSellPrice || v.sellPrice || v.price || '0'),
+                    weight: parseFloat(v.variantWeight || v.weight || '0'),
+                    dimensions: v.variantLength && v.variantWidth && v.variantHeight ? 
                       JSON.stringify({
                         length: v.variantLength,
                         width: v.variantWidth,
-                        height: v.variantHeight
+                        height: v.variantHeight,
+                        volume: v.variantVolume
                       }) : null,
-                    image: v.variantImage || null,
-                    stock: parseInt(v.stock || v.variantStock || '0', 10), // ✅ AJOUT DU STOCK
-                    status: variantStatus || ((parseInt(v.stock || '0', 10) > 0) ? 'available' : 'out_of_stock'),
+                    image: v.variantImage || v.image || null,
+                    stock: stockValue, // ✅ Stock depuis l'API CJ ou JSON
+                    status: variantStatus || (stockValue > 0 ? 'available' : 'out_of_stock'),
                     properties: JSON.stringify({
-                      key: v.variantKey || '',
-                      value1: v.variantValue1 || '',
-                      value2: v.variantValue2 || '',
-                      value3: v.variantValue3 || '',
+                      key: v.variantKey || v.key || '',
+                      value1: v.variantValue1 || v.value1 || '',
+                      value2: v.variantValue2 || v.value2 || '',
+                      value3: v.variantValue3 || v.value3 || '',
                     }),
                     cjVariantId: v.vid || v.variantId || ''
                   };
@@ -330,7 +369,7 @@ export class CJWebhookService {
             }
           });
 
-          this.logger.log(`✅ Produit créé depuis CJProductStore: ${existingProduct.id} avec ${existingProduct.productVariants.length} variants`);
+          this.logger.log(`✅ Produit créé depuis CJProductStore: ${existingProduct.id} avec ${existingProduct.productVariants.length} variants, stock total: ${totalStock}`);
         }
       }
 
