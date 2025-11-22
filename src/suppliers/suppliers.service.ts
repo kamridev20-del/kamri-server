@@ -294,24 +294,38 @@ export class SuppliersService {
         if (cjStoreProducts.length === 0) {
           // ✅ Vérifier s'il y a des produits avec status 'imported' qui ne sont pas dans Product
           // Inclure les produits sans cjProductId OU ceux qui ont un cjProductId mais ne sont pas dans Product
-          const importedButNotInProduct = allCJProducts.filter(
+          const allImportedProducts = allCJProducts.filter(p => p.status === 'imported');
+          console.log(`🔍 DEBUG - Analyse des produits 'imported': ${allImportedProducts.length} produits trouvés`);
+          
+          const importedButNotInProduct = allImportedProducts.filter(
             p => {
-              if (p.status !== 'imported') return false;
               // Si pas de cjProductId, on peut le remettre en available
-              if (!p.cjProductId || p.cjProductId.trim() === '') return true;
+              if (!p.cjProductId || p.cjProductId.trim() === '') {
+                console.log(`   ✅ Produit 'imported' sans cjProductId: ${p.id} (${p.name}) - sera remis en 'available'`);
+                return true;
+              }
               // Si a un cjProductId, vérifier qu'il n'est pas dans Product
-              return !existingCJProductIds.has(p.cjProductId);
+              const isInProduct = existingCJProductIds.has(p.cjProductId);
+              if (!isInProduct) {
+                console.log(`   ✅ Produit 'imported' non trouvé dans Product: ${p.id} (${p.name}) - cjProductId: ${p.cjProductId} - sera remis en 'available'`);
+              } else {
+                console.log(`   ❌ Produit 'imported' déjà dans Product: ${p.id} (${p.name}) - cjProductId: ${p.cjProductId}`);
+              }
+              return !isInProduct;
             }
           );
           
+          console.log(`🔍 DEBUG - Produits 'imported' à remettre en 'available': ${importedButNotInProduct.length} sur ${allImportedProducts.length}`);
+          
           if (importedButNotInProduct.length > 0) {
             console.log(`🔄 ${importedButNotInProduct.length} produits marqués 'imported' mais absents de Product - Remise en 'available'`);
-            await this.prisma.cJProductStore.updateMany({
+            const updateResult = await this.prisma.cJProductStore.updateMany({
               where: { 
                 id: { in: importedButNotInProduct.map(p => p.id) }
               },
               data: { status: 'available' }
             });
+            console.log(`✅ ${updateResult.count} produits mis à jour avec succès`);
             
             // Récupérer à nouveau tous les produits disponibles et filtrer manuellement
             const allNewAvailableProducts = await this.prisma.cJProductStore.findMany({
@@ -320,6 +334,8 @@ export class SuppliersService {
               },
               orderBy: { createdAt: 'desc' }
             });
+            
+            console.log(`📦 ${allNewAvailableProducts.length} produits maintenant 'available' après remise en statut`);
             
             // Filtrer manuellement pour exclure ceux déjà importés
             const newCJStoreProducts = allNewAvailableProducts.filter(
@@ -331,12 +347,18 @@ export class SuppliersService {
               }
             );
             
+            console.log(`✅ ${newCJStoreProducts.length} produits disponibles à importer après filtrage`);
+            
             if (newCJStoreProducts.length > 0) {
               console.log(`✅ ${newCJStoreProducts.length} produits remis en statut 'available' et prêts à importer`);
               // Remplacer cjStoreProducts avec les nouveaux produits
               cjStoreProducts.length = 0; // Vider le tableau
               cjStoreProducts.push(...newCJStoreProducts);
+            } else {
+              console.log(`⚠️ Aucun produit disponible après remise en statut et filtrage`);
             }
+          } else {
+            console.log(`⚠️ Aucun produit 'imported' trouvé qui ne soit pas dans Product. Tous les ${allImportedProducts.length} produits 'imported' sont déjà dans Product.`);
           }
           
           // ✅ Vérifier s'il y a des produits disponibles mais déjà importés
