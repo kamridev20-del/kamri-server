@@ -1744,11 +1744,33 @@ export class ProductsService {
     return products.map(product => {
       const processed = this.processProductImages(product);
       // ✅ Calculer le stock total depuis les variants (comme dans findAll)
+      let totalStock = 0;
+      
+      // 1️⃣ PRIORITÉ : Calculer depuis productVariants (relation Prisma)
       if (processed.productVariants && processed.productVariants.length > 0) {
-        const totalStock = processed.productVariants.reduce((sum, v) => sum + (v.stock || 0), 0);
-        return { ...processed, stock: totalStock };
+        totalStock = processed.productVariants.reduce((sum, v) => sum + (v.stock || 0), 0);
       }
-      return processed;
+      
+      // 2️⃣ FALLBACK : Si stock = 0 et qu'on a un JSON variants, calculer depuis le JSON
+      if (totalStock === 0 && processed.variants) {
+        try {
+          const variantsJson = typeof processed.variants === 'string' 
+            ? JSON.parse(processed.variants) 
+            : processed.variants;
+          
+          if (Array.isArray(variantsJson) && variantsJson.length > 0) {
+            totalStock = variantsJson.reduce((sum: number, v: any) => {
+              const variantStock = parseInt(v.variantStock || v.stock || 0, 10);
+              return sum + variantStock;
+            }, 0);
+            console.log(`📊 [GET-DRAFT] Stock calculé depuis JSON variants pour produit ${processed.id}: ${totalStock}`);
+          }
+        } catch (error) {
+          console.warn(`⚠️ [GET-DRAFT] Erreur parsing variants JSON pour produit ${processed.id}:`, error);
+        }
+      }
+      
+      return { ...processed, stock: totalStock };
     });
   }
 
