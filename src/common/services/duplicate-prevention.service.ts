@@ -251,7 +251,8 @@ export class DuplicatePreventionService {
         // Mettre à jour tous les champs CJ spécifiques
         const cjFields = [
           'suggestSellPrice', 'variants', 'dimensions', 'brand', 'tags',
-          'productWeight', 'packingWeight', 'materialNameEn', 'packingNameEn'
+          'productWeight', 'packingWeight', 'materialNameEn', 'packingNameEn',
+          'externalCategory' // ✅ Préserver externalCategory lors de la mise à jour
         ];
         
         cjFields.forEach(field => {
@@ -259,6 +260,24 @@ export class DuplicatePreventionService {
             updateData[field] = productData[field];
           }
         });
+        
+        // ✅ Si categoryName est fourni mais pas externalCategory, utiliser categoryName
+        if (productData.categoryName && !productData.externalCategory) {
+          updateData.externalCategory = productData.categoryName;
+        }
+        
+        // ✅ Mapper externalCategory vers categoryId si fourni et si categoryId n'est pas déjà défini
+        if (updateData.externalCategory && duplicateCheck.existingProduct?.supplierId && !updateData.categoryId) {
+          try {
+            const mappedCategoryId = await this.mapExternalCategory(updateData.externalCategory, duplicateCheck.existingProduct.supplierId);
+            if (mappedCategoryId) {
+              updateData.categoryId = mappedCategoryId;
+              this.logger.log(`✅ Catégorie mappée automatiquement lors de la mise à jour: ${updateData.externalCategory} → ${mappedCategoryId}`);
+            }
+          } catch (e) {
+            this.logger.warn(`⚠️ Erreur lors du mapping de externalCategory lors de la mise à jour:`, e);
+          }
+        }
 
         const updatedProduct = await this.prisma.product.update({
           where: { id: duplicateCheck.existingProduct.id },
@@ -317,6 +336,21 @@ export class DuplicatePreventionService {
         // ✅ S'assurer que source est défini
         if (!createData.source) {
           createData.source = 'cj-dropshipping';
+        }
+        
+        // ✅ Mapper externalCategory vers categoryId si fourni et si categoryId n'est pas déjà défini
+        if (createData.externalCategory && createData.supplierId && !createData.categoryId) {
+          try {
+            const mappedCategoryId = await this.mapExternalCategory(createData.externalCategory, createData.supplierId);
+            if (mappedCategoryId) {
+              createData.categoryId = mappedCategoryId;
+              this.logger.log(`✅ Catégorie mappée automatiquement: ${createData.externalCategory} → ${mappedCategoryId}`);
+            } else {
+              this.logger.log(`⚠️ Aucun mapping trouvé pour externalCategory: ${createData.externalCategory}`);
+            }
+          } catch (e) {
+            this.logger.warn(`⚠️ Erreur lors du mapping de externalCategory:`, e);
+          }
         }
         
         // ✅ Vérifier que categoryId existe dans la base de données
@@ -622,5 +656,44 @@ export class DuplicatePreventionService {
       duplicatesFound,
       lastImports: recentImports
     };
+  }
+
+  /**
+   * Mapper automatiquement une catégorie externe vers une catégorie interne
+   */
+  private async mapExternalCategory(externalCategory: string, supplierId: string): Promise<string | null> {
+    if (!externalCategory || !supplierId) {
+      return null;
+    }
+
+    this.logger.log(`🔍 [MAP-CATEGORY] Recherche mapping pour: "${externalCategory}" (Supplier: ${supplierId})`);
+
+    // Vérifier s'il existe un mapping pour cette catégorie externe
+    const existingMapping = await this.prisma.categoryMapping.findFirst({
+      where: {
+        supplierId: supplierId,
+        externalCategory: externalCategory
+      }
+    });
+
+    if (existingMapping) {
+      this.logger.log(`✅ [MAP-CATEGORY] Mapping trouvé: ${externalCategory} → ${existingMapping.internalCategory}`);
+      
+      // Vérifier si internalCategory est un ID valide
+      const category = await this.prisma.category.findUnique({
+        where: { id: existingMapping.internalCategory }
+      });
+
+      if (category) {
+        this.logger.log(`✅ [MAP-CATEGORY] Catégorie interne trouvée: ${category.name} (ID: ${category.id})`);
+        return category.id;
+      } else {
+        this.logger.warn(`⚠️ [MAP-CATEGORY] Catégorie interne non trouvée pour ID: ${existingMapping.internalCategory}`);
+      }
+    } else {
+      this.logger.log(`❌ [MAP-CATEGORY] Aucun mapping trouvé pour "${externalCategory}"`);
+    }
+
+    return null;
   }
 }

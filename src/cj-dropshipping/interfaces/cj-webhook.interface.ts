@@ -32,11 +32,13 @@ export interface CJVariantParams {
   variantSku: string | null;
   variantKey: string | null;
   variantSellPrice: number | null;
+  variantStock?: number | null; // ✅ Stock de la variante (optionnel)
   variantStatus: string | null;
   variantValue1: string | null;
   variantValue2: string | null;
   variantValue3: string | null;
   fields: string[]; // Champs modifiés
+  pid?: string; // ✅ ID du produit parent (optionnel)
 }
 
 export interface CJStockParams {
@@ -101,4 +103,5 @@ export interface WebhookProcessingResult {
   processedAt: Date;
   changes?: string[];
   error?: string;
+  message?: string; // ✅ Message optionnel pour les résultats de traitement
 }
