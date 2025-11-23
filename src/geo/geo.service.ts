@@ -12,7 +12,7 @@ export interface GeoLocationResult {
 @Injectable()
 export class GeoLocationService {
   private readonly logger = new Logger(GeoLocationService.name);
-  private readonly ipapiUrl = 'http://api.ipapi.com/api';
+  private readonly ipapiUrl = 'https://api.ipapi.com/api';
 
   constructor(private configService: ConfigService) {}
 
