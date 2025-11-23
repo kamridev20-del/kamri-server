@@ -17,6 +17,7 @@ import { EditProductDto } from './dto/edit-product.dto';
 import { PrepareProductDto } from './dto/prepare-product.dto';
 import { ProductsService } from './products.service';
 import { ShippingValidationService } from '../shipping/shipping-validation.service';
+import { ProductViewersService } from './product-viewers.service';
 
 @ApiTags('products')
 @Controller('api/products')
@@ -24,6 +25,7 @@ export class ProductsController {
   constructor(
     private readonly productsService: ProductsService,
     private readonly shippingValidationService: ShippingValidationService,
+    private readonly productViewersService: ProductViewersService,
   ) {}
 
   @Post()
@@ -294,6 +296,40 @@ export class ProductsController {
   @ApiResponse({ status: 200, description: 'Descriptions nettoyées avec succès' })
   cleanupDescriptions() {
     return this.productsService.cleanupAllDescriptions();
+  }
+
+  // ✅ Endpoints pour le tracking des viewers
+  @Post(':id/viewers')
+  @ApiOperation({ summary: 'Enregistrer un viewer actif pour un produit' })
+  @ApiResponse({ status: 200, description: 'Viewer enregistré avec succès' })
+  @ApiParam({ name: 'id', description: 'ID du produit' })
+  addViewer(
+    @Param('id') productId: string,
+    @Body('sessionId') sessionId: string,
+  ) {
+    const viewersCount = this.productViewersService.addViewer(productId, sessionId);
+    return { viewersCount };
+  }
+
+  @Delete(':id/viewers')
+  @ApiOperation({ summary: 'Retirer un viewer actif pour un produit' })
+  @ApiResponse({ status: 200, description: 'Viewer retiré avec succès' })
+  @ApiParam({ name: 'id', description: 'ID du produit' })
+  removeViewer(
+    @Param('id') productId: string,
+    @Body('sessionId') sessionId: string,
+  ) {
+    const viewersCount = this.productViewersService.removeViewer(productId, sessionId);
+    return { viewersCount };
+  }
+
+  @Get(':id/viewers')
+  @ApiOperation({ summary: 'Récupérer le nombre de viewers actifs pour un produit' })
+  @ApiResponse({ status: 200, description: 'Nombre de viewers récupéré avec succès' })
+  @ApiParam({ name: 'id', description: 'ID du produit' })
+  getViewersCount(@Param('id') productId: string) {
+    const viewersCount = this.productViewersService.getViewersCount(productId);
+    return { viewersCount };
   }
 }
 
