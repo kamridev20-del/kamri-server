@@ -68,7 +68,7 @@ export type SupportedCurrency = typeof SUPPORTED_CURRENCIES[number];
 @Injectable()
 export class CurrencyService {
   private readonly logger = new Logger(CurrencyService.name);
-  private readonly EXCHANGE_API_URL = 'https://api.exchangerate.host/latest';
+  private readonly EXCHANGE_API_URL = 'https://api.apilayer.com/currency_data/live';
 
   constructor(
     private prisma: PrismaService,
@@ -83,27 +83,50 @@ export class CurrencyService {
   }
 
   /**
-   * Récupérer les taux de change depuis l'API externe
+   * Récupérer les taux de change depuis l'API externe (Currency Data API)
    */
   async fetchExchangeRates(): Promise<Record<string, number> | null> {
     try {
-      this.logger.log('🔄 Récupération des taux de change depuis exchangerate.host...');
+      const apiKey = this.configService.get<string>('CURRENCY_API_KEY');
+      if (!apiKey) {
+        this.logger.error('❌ CURRENCY_API_KEY non configurée dans les variables d\'environnement');
+        return null;
+      }
+
+      this.logger.log('🔄 Récupération des taux de change depuis Currency Data API...');
+      
+      // Construire la liste des devises supportées
+      const symbols = SUPPORTED_CURRENCIES.join(',');
       
       const response = await axios.get(this.EXCHANGE_API_URL, {
         params: {
-          base: 'USD', // Base USD
+          base: 'USD',
+          symbols: symbols, // Limiter aux devises supportées
+        },
+        headers: {
+          'apikey': apiKey,
         },
         timeout: 10000,
       });
 
-      if (response.data && response.data.rates) {
+      if (response.data && response.data.success && response.data.quotes) {
         this.logger.log('✅ Taux de change récupérés avec succès');
-        return response.data.rates;
+        
+        // Convertir le format quotes (USDUSD=1.0, USDEUR=0.92) en format simple (EUR=0.92)
+        const rates: Record<string, number> = {};
+        Object.keys(response.data.quotes).forEach((key) => {
+          // key format: "USDEUR" -> extraire "EUR"
+          const currency = key.replace('USD', '');
+          rates[currency] = response.data.quotes[key];
+        });
+        
+        return rates;
       }
 
+      this.logger.error('❌ Format de réponse API invalide:', response.data);
       return null;
-    } catch (error) {
-      this.logger.error('❌ Erreur lors de la récupération des taux:', error);
+    } catch (error: any) {
+      this.logger.error('❌ Erreur lors de la récupération des taux:', error.response?.data || error.message);
       return null;
     }
   }
