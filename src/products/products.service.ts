@@ -392,6 +392,132 @@ export class ProductsService {
   private readonly CJ_API_BASE = 'https://api.cjdropshipping.com/api2.0/v1';
   private readonly CJ_API_KEY = process.env.CJ_API_KEY;
 
+  /**
+   * Rechercher des produits et catégories dans la base de données
+   */
+  async searchProductsAndCategories(query: string, limit: number = 10) {
+    if (!query || query.trim().length === 0) {
+      return {
+        products: [],
+        categories: [],
+        totalProducts: 0,
+        totalCategories: 0,
+      };
+    }
+
+    const searchTerm = query.trim().toLowerCase();
+
+    try {
+      // Rechercher les produits
+      const products = await this.prisma.product.findMany({
+        where: {
+          status: 'active',
+          OR: [
+            { name: { contains: searchTerm, mode: 'insensitive' } },
+            { description: { contains: searchTerm, mode: 'insensitive' } },
+            { brand: { contains: searchTerm, mode: 'insensitive' } },
+          ],
+        },
+        include: {
+          category: true,
+          supplier: true,
+          images: true,
+          productVariants: {
+            where: { isActive: true },
+            select: {
+              id: true,
+              stock: true,
+              price: true,
+            },
+          },
+        },
+        take: limit,
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+
+      // Rechercher les catégories
+      const categories = await this.prisma.category.findMany({
+        where: {
+          isActive: true,
+          OR: [
+            { name: { contains: searchTerm, mode: 'insensitive' } },
+            { nameEn: { contains: searchTerm, mode: 'insensitive' } },
+            { description: { contains: searchTerm, mode: 'insensitive' } },
+          ],
+        },
+        select: {
+          id: true,
+          name: true,
+          nameEn: true,
+          description: true,
+          icon: true,
+          imageUrl: true,
+          _count: {
+            select: {
+              products: {
+                where: {
+                  status: 'active',
+                },
+              },
+            },
+          },
+        },
+        take: Math.min(limit, 5), // Limiter à 5 catégories max
+        orderBy: {
+          name: 'asc',
+        },
+      });
+
+      // Compter le total de produits correspondants
+      const totalProducts = await this.prisma.product.count({
+        where: {
+          status: 'active',
+          OR: [
+            { name: { contains: searchTerm, mode: 'insensitive' } },
+            { description: { contains: searchTerm, mode: 'insensitive' } },
+            { brand: { contains: searchTerm, mode: 'insensitive' } },
+          ],
+        },
+      });
+
+      // Transformer les produits pour le frontend
+      const processedProducts = products.map(product => {
+        const processed = this.processProductImages(product);
+        // Calculer le stock total depuis les variants
+        if (processed.productVariants && processed.productVariants.length > 0) {
+          const totalStock = processed.productVariants.reduce((sum, v) => sum + (v.stock || 0), 0);
+          return { ...processed, stock: totalStock };
+        }
+        return processed;
+      });
+
+      return {
+        products: processedProducts,
+        categories: categories.map(cat => ({
+          id: cat.id,
+          name: cat.name,
+          nameEn: cat.nameEn,
+          description: cat.description,
+          icon: cat.icon,
+          imageUrl: cat.imageUrl,
+          productCount: cat._count.products,
+        })),
+        totalProducts,
+        totalCategories: categories.length,
+      };
+    } catch (error) {
+      this.logger.error('Erreur lors de la recherche:', error);
+      return {
+        products: [],
+        categories: [],
+        totalProducts: 0,
+        totalCategories: 0,
+      };
+    }
+  }
+
   async searchCJProducts(params: any) {
     try {
       // Construire les paramètres de recherche pour l'API CJ

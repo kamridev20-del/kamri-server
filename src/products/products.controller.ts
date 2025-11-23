@@ -45,6 +45,16 @@ export class ProductsController {
     return this.productsService.findAll();
   }
 
+  @Get('search')
+  @ApiOperation({ summary: 'Rechercher des produits et catégories' })
+  @ApiResponse({ status: 200, description: 'Résultats de recherche' })
+  @ApiQuery({ name: 'q', required: true, description: 'Terme de recherche' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Nombre de résultats (défaut: 10)' })
+  async search(@Query('q') query: string, @Query('limit') limit?: string) {
+    const resultLimit = limit ? parseInt(limit, 10) : 10;
+    return this.productsService.searchProductsAndCategories(query, resultLimit);
+  }
+
   @Get('admin/all')
   @ApiOperation({ summary: 'Get all products for admin (including pending)' })
   @ApiResponse({ status: 200, description: 'All products retrieved successfully' })
