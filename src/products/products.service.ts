@@ -393,19 +393,86 @@ export class ProductsService {
   private readonly CJ_API_KEY = process.env.CJ_API_KEY;
 
   /**
+   * Obtenir les recherches populaires
+   */
+  async getPopularSearches(limit: number = 8) {
+    try {
+      const popularSearches = await this.prisma.searchHistory.findMany({
+        orderBy: [
+          { count: 'desc' },
+          { lastSearchedAt: 'desc' },
+        ],
+        take: limit,
+        select: {
+          query: true,
+          count: true,
+        },
+      });
+
+      return popularSearches.map(s => s.query);
+    } catch (error) {
+      this.logger.error('Erreur lors de la récupération des recherches populaires:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Enregistrer une recherche dans l'historique
+   */
+  private async recordSearch(query: string) {
+    if (!query || query.trim().length < 2) return;
+
+    const searchTerm = query.trim().toLowerCase();
+
+    try {
+      await this.prisma.searchHistory.upsert({
+        where: { query: searchTerm },
+        update: {
+          count: { increment: 1 },
+          lastSearchedAt: new Date(),
+        },
+        create: {
+          query: searchTerm,
+          count: 1,
+          lastSearchedAt: new Date(),
+        },
+      });
+    } catch (error) {
+      // Ignorer les erreurs silencieusement pour ne pas bloquer la recherche
+      this.logger.debug('Erreur lors de l\'enregistrement de la recherche:', error);
+    }
+  }
+
+  /**
    * Rechercher des produits et catégories dans la base de données
    */
-  async searchProductsAndCategories(query: string, limit: number = 10) {
-    if (!query || query.trim().length === 0) {
+  async searchProductsAndCategories(query: string, limit: number = 10, includePopular: boolean = false) {
+    const searchTerm = query ? query.trim().toLowerCase() : '';
+
+    // Si pas de query, retourner les recherches populaires si demandé
+    if (!searchTerm && includePopular) {
+      const popularSearches = await this.getPopularSearches(8);
       return {
         products: [],
         categories: [],
         totalProducts: 0,
         totalCategories: 0,
+        popularSearches,
       };
     }
 
-    const searchTerm = query.trim().toLowerCase();
+    if (!searchTerm) {
+      return {
+        products: [],
+        categories: [],
+        totalProducts: 0,
+        totalCategories: 0,
+        popularSearches: [],
+      };
+    }
+
+    // Enregistrer la recherche dans l'historique
+    await this.recordSearch(searchTerm);
 
     try {
       // Rechercher les produits
@@ -506,6 +573,7 @@ export class ProductsService {
         })),
         totalProducts,
         totalCategories: categories.length,
+        popularSearches: [],
       };
     } catch (error) {
       this.logger.error('Erreur lors de la recherche:', error);
@@ -514,6 +582,7 @@ export class ProductsService {
         categories: [],
         totalProducts: 0,
         totalCategories: 0,
+        popularSearches: [],
       };
     }
   }

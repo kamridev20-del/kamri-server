@@ -48,11 +48,17 @@ export class ProductsController {
   @Get('search')
   @ApiOperation({ summary: 'Rechercher des produits et catégories' })
   @ApiResponse({ status: 200, description: 'Résultats de recherche' })
-  @ApiQuery({ name: 'q', required: true, description: 'Terme de recherche' })
+  @ApiQuery({ name: 'q', required: false, description: 'Terme de recherche' })
   @ApiQuery({ name: 'limit', required: false, description: 'Nombre de résultats (défaut: 10)' })
-  async search(@Query('q') query: string, @Query('limit') limit?: string) {
+  @ApiQuery({ name: 'popular', required: false, description: 'Inclure les recherches populaires si pas de query' })
+  async search(
+    @Query('q') query?: string,
+    @Query('limit') limit?: string,
+    @Query('popular') popular?: string
+  ) {
     const resultLimit = limit ? parseInt(limit, 10) : 10;
-    return this.productsService.searchProductsAndCategories(query, resultLimit);
+    const includePopular = popular === 'true' || popular === '1';
+    return this.productsService.searchProductsAndCategories(query || '', resultLimit, includePopular);
   }
 
   @Get('admin/all')

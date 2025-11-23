@@ -637,3 +637,18 @@ model CJSourcingRequest {
   @@map("cj_sourcing_requests")
 }
 
+// ✅ Modèle pour stocker les recherches populaires
+model SearchHistory {
+  id        String   @id @default(cuid())
+  query     String   // Terme de recherche
+  count     Int      @default(1) // Nombre de fois recherché
+  lastSearchedAt DateTime @default(now()) // Dernière recherche
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([query])
+  @@index([count])
+  @@index([lastSearchedAt])
+  @@map("search_history")
+}
+
