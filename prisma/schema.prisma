@@ -652,3 +652,14 @@ model SearchHistory {
   @@map("search_history")
 }
 
+// ✅ Modèle pour stocker les taux de change
+model ExchangeRate {
+  id        String   @id @default(cuid())
+  currency  String   @unique // Code devise (EUR, USD, XAF, XOF, CNY)
+  rate      Float    // Taux de change depuis USD (ex: 1 USD = 0.92 EUR)
+  updatedAt DateTime @default(now()) @updatedAt // Dernière mise à jour
+
+  @@index([currency])
+  @@map("exchange_rates")
+}
+

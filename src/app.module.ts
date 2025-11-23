@@ -10,6 +10,7 @@ import { CommonModule } from './common/common.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { GeoModule } from './geo/geo.module';
 import { HealthModule } from './health/health.module';
+import { CurrencyModule } from './currency/currency.module';
 import { OrdersModule } from './orders/orders.module';
 import { PaymentsModule } from './payments/payments.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -68,6 +69,7 @@ import { WishlistModule } from './wishlist/wishlist.module';
     GeoModule, // ✅ Module géolocalisation
     ShippingModule, // ✅ Module validation livraison
     UploadModule, // ✅ Module upload d'images
+    CurrencyModule, // ✅ Module gestion des devises
   ],
 })
 export class AppModule {}
