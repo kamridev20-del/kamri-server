@@ -5,6 +5,7 @@ import axios from 'axios';
 export interface GeoLocationResult {
   countryCode: string;
   countryName: string;
+  currency?: string; // Code devise depuis l'API (ex: USD, EUR, XAF)
   ip?: string;
   source: 'ipapi' | 'manual' | 'address';
 }
@@ -41,7 +42,7 @@ export class GeoLocationService {
         params: {
           access_key: accessKey,
           // Paramètres optionnels pour optimiser la réponse
-          fields: 'ip,country_code,country_name', // Seulement les champs nécessaires (plus rapide)
+          fields: 'ip,country_code,country_name,currency', // Inclure currency pour obtenir la devise directement
           language: 'fr', // Noms de pays en français
           output: 'json', // Format JSON explicite
         },
@@ -70,14 +71,18 @@ export class GeoLocationService {
       }
 
       if (response.data && response.data.country_code) {
+        // Extraire la devise depuis l'objet currency si disponible
+        const currencyCode = response.data.currency?.code || response.data.currency;
+        
         const result: GeoLocationResult = {
           countryCode: response.data.country_code,
           countryName: response.data.country_name || response.data.country_code,
+          currency: currencyCode, // Devise depuis l'API (ex: USD, EUR, XAF)
           ip: response.data.ip || ip,
           source: 'ipapi',
         };
 
-        this.logger.log(`✅ Pays détecté: ${result.countryCode} (${result.countryName}) via ipapi.com`);
+        this.logger.log(`✅ Pays détecté: ${result.countryCode} (${result.countryName}) - Devise: ${result.currency || 'N/A'} via ipapi.com`);
         return result;
       }
 
