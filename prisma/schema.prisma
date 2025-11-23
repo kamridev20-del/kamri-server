@@ -657,7 +657,7 @@ model ExchangeRate {
   id        String   @id @default(cuid())
   currency  String   @unique // Code devise (EUR, USD, XAF, XOF, CNY)
   rate      Float    // Taux de change depuis USD (ex: 1 USD = 0.92 EUR)
-  updatedAt DateTime @default(now()) @updatedAt // Dernière mise à jour
+  updatedat DateTime @default(now()) @map("updatedat") // Dernière mise à jour (nom de colonne Railway en minuscules)
 
   @@index([currency])
   @@map("exchange_rates")

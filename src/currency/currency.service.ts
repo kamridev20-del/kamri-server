@@ -155,7 +155,7 @@ export class CurrencyService {
             where: { currency },
             update: {
               rate: rates[currency],
-              updatedAt: new Date(),
+              updatedat: new Date(),
             },
             create: {
               currency,
@@ -171,7 +171,7 @@ export class CurrencyService {
         where: { currency: 'USD' },
         update: {
           rate: 1.0,
-          updatedAt: new Date(),
+          updatedat: new Date(),
         },
         create: {
           currency: 'USD',

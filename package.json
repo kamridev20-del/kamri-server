@@ -24,6 +24,7 @@
     "db:studio": "prisma studio",
     "db:clear-products": "ts-node -r tsconfig-paths/register src/scripts/clear-all-products.ts",
     "db:clear-orders": "ts-node -r tsconfig-paths/register src/scripts/clear-all-orders.ts",
+    "test:currency": "ts-node -r tsconfig-paths/register src/scripts/test-currency.ts",
     "db:setup-postgres": "bash scripts/setup-postgresql.sh",
     "db:setup-postgres:win": "powershell -ExecutionPolicy Bypass -File scripts/setup-postgresql-simple.ps1",
     "db:setup-postgres:simple": "powershell -ExecutionPolicy Bypass -File scripts/setup-postgresql-simple.ps1",
