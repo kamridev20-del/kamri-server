@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Logger, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Logger, Param, Post, Query } from '@nestjs/common';
 import { CJWebhookService } from './cj-webhook.service';
 
 export interface CJWebhookPayload {
@@ -169,5 +169,20 @@ export class CJWebhookController {
   async getWebhookStatus() {
     this.logger.log('📊 Récupération du statut des webhooks');
     return this.cjWebhookService.getWebhookStatus();
+  }
+
+  /**
+   * Importer manuellement un produit depuis CJProductStore vers Product
+   * @param cjProductStoreId ID du produit dans CJProductStore
+   * @param categoryId ID de la catégorie (optionnel)
+   */
+  @Post('import-product/:cjProductStoreId')
+  @HttpCode(HttpStatus.OK)
+  async importProductFromStore(
+    @Param('cjProductStoreId') cjProductStoreId: string,
+    @Body() body?: { categoryId?: string }
+  ) {
+    this.logger.log(`📦 Import manuel du produit: ${cjProductStoreId}`);
+    return this.cjWebhookService.importProductFromStore(cjProductStoreId, body?.categoryId);
   }
 }

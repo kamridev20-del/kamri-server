@@ -333,10 +333,12 @@ export class CategoriesService {
     });
     console.log(`📦 Total produits draft avec catégorie "${category.name}": ${productsWithCategory}`);
 
-    // ✅ NOUVEAU : Créer automatiquement les produits depuis CJProductStore vers Product (draft)
-    const createdProducts = await this.createProductsFromCJStore(data.supplierId, data.externalCategory, category.id);
+    // ✅ DÉSACTIVÉ : Ne plus créer automatiquement les produits depuis CJProductStore
+    // L'utilisateur doit importer manuellement les produits depuis la page webhooks/magasin CJ
+    // const createdProducts = await this.createProductsFromCJStore(data.supplierId, data.externalCategory, category.id);
+    const createdProducts = { count: 0 };
 
-    console.log(`📦 ${createdProducts.count} nouveaux produits créés depuis CJProductStore vers draft`);
+    console.log(`📋 Mapping créé. Les produits peuvent être importés manuellement depuis la page "Magasin CJ"`);
     
     // ✅ Vérifier combien de produits draft ont maintenant cette catégorie
     const finalProductsCount = await this.prisma.product.count({
