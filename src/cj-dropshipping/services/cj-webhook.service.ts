@@ -1153,8 +1153,16 @@ export class CJWebhookService {
           }
         });
         if (categoryMapping) {
-          finalCategoryId = categoryMapping.internalCategoryId;
-          this.logger.log(`✅ Catégorie mappée automatiquement: ${cjProduct.category} → ${finalCategoryId}`);
+          // internalCategory est le nom de la catégorie, on doit trouver l'ID
+          const category = await this.prisma.category.findFirst({
+            where: { name: categoryMapping.internalCategory }
+          });
+          if (category) {
+            finalCategoryId = category.id;
+            this.logger.log(`✅ Catégorie mappée automatiquement: ${cjProduct.category} → ${category.name} (${category.id})`);
+          } else {
+            this.logger.warn(`⚠️ Catégorie "${categoryMapping.internalCategory}" non trouvée dans la base de données`);
+          }
         } else {
           this.logger.warn(`⚠️ Aucun mapping trouvé pour "${cjProduct.category}", produit créé sans catégorie`);
         }

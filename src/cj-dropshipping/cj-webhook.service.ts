@@ -1,12 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { DuplicatePreventionService } from '../common/services/duplicate-prevention.service';
 import { CJWebhookPayload } from './interfaces/cj-webhook.interface';
 
 @Injectable()
 export class CJWebhookService {
   private readonly logger = new Logger(CJWebhookService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private duplicatePreventionService: DuplicatePreventionService
+  ) {}
 
   /**
    * Traite les webhooks CJ
@@ -452,6 +456,180 @@ export class CJWebhookService {
     } catch (error) {
       this.logger.error(`❌ Erreur récupération statut webhooks: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : 'N/A');
       throw error;
+    }
+  }
+
+  /**
+   * Importer un produit depuis CJProductStore vers Product (manuellement)
+   * @param cjProductStoreId ID du produit dans CJProductStore
+   * @param categoryId ID de la catégorie (optionnel, sera mappé automatiquement si non fourni)
+   * @returns Le produit importé
+   */
+  async importProductFromStore(cjProductStoreId: string, categoryId?: string): Promise<{
+    success: boolean;
+    message: string;
+    product?: any;
+    error?: string;
+  }> {
+    this.logger.log(`📦 Import manuel du produit depuis CJProductStore: ${cjProductStoreId}`);
+    
+    try {
+      // Récupérer le produit depuis CJProductStore
+      const cjProduct = await this.prisma.cJProductStore.findUnique({
+        where: { id: cjProductStoreId }
+      });
+
+      if (!cjProduct) {
+        return {
+          success: false,
+          message: 'Produit non trouvé dans le magasin CJ',
+          error: 'PRODUCT_NOT_FOUND'
+        };
+      }
+
+      // Vérifier si le produit n'est pas déjà importé
+      const existingProduct = await this.prisma.product.findFirst({
+        where: {
+          OR: [
+            { cjProductId: cjProduct.cjProductId },
+            {
+              name: cjProduct.name,
+              source: 'cj-dropshipping'
+            }
+          ]
+        }
+      });
+
+      if (existingProduct) {
+        return {
+          success: false,
+          message: 'Ce produit a déjà été importé',
+          error: 'PRODUCT_ALREADY_IMPORTED',
+          product: existingProduct
+        };
+      }
+
+      // Récupérer le fournisseur CJ Dropshipping
+      const cjSupplier = await this.prisma.supplier.findFirst({
+        where: { name: 'CJ Dropshipping' }
+      });
+
+      if (!cjSupplier) {
+        return {
+          success: false,
+          message: 'Fournisseur CJ Dropshipping non trouvé',
+          error: 'SUPPLIER_NOT_FOUND'
+        };
+      }
+
+      // Mapper la catégorie si nécessaire
+      let finalCategoryId = categoryId;
+      if (!finalCategoryId && cjProduct.category) {
+        const categoryMapping = await this.prisma.categoryMapping.findFirst({
+          where: {
+            supplierId: cjSupplier.id,
+            externalCategory: cjProduct.category
+          }
+        });
+        if (categoryMapping) {
+          // internalCategory est le nom de la catégorie, on doit trouver l'ID
+          const category = await this.prisma.category.findFirst({
+            where: { name: categoryMapping.internalCategory }
+          });
+          if (category) {
+            finalCategoryId = category.id;
+            this.logger.log(`✅ Catégorie mappée automatiquement: ${cjProduct.category} → ${category.name} (${category.id})`);
+          } else {
+            this.logger.warn(`⚠️ Catégorie "${categoryMapping.internalCategory}" non trouvée dans la base de données`);
+          }
+        } else {
+          this.logger.warn(`⚠️ Aucun mapping trouvé pour "${cjProduct.category}", produit créé sans catégorie`);
+        }
+      }
+
+      // Préparer les données du produit
+      const productData = {
+        name: cjProduct.name,
+        description: cjProduct.description || '',
+        price: cjProduct.price || 0,
+        originalPrice: cjProduct.originalPrice || cjProduct.price || 0,
+        image: cjProduct.image || '',
+        supplierId: cjSupplier.id,
+        externalCategory: cjProduct.category || '',
+        categoryId: finalCategoryId || null,
+        source: 'cj-dropshipping',
+        status: 'draft', // ✅ Produit en attente de validation
+        badge: 'nouveau',
+        stock: 0,
+        cjProductId: cjProduct.cjProductId || '',
+        productSku: cjProduct.productSku || '',
+        productWeight: cjProduct.productWeight,
+        packingWeight: cjProduct.packingWeight,
+        productType: cjProduct.productType,
+        productUnit: cjProduct.productUnit,
+        productKeyEn: cjProduct.productKeyEn,
+        materialNameEn: cjProduct.materialNameEn,
+        packingNameEn: cjProduct.packingNameEn,
+        suggestSellPrice: cjProduct.suggestSellPrice,
+        listedNum: cjProduct.listedNum,
+        supplierName: cjProduct.supplierName,
+        createrTime: cjProduct.createrTime,
+        variants: cjProduct.variants,
+        cjReviews: cjProduct.reviews,
+        dimensions: cjProduct.dimensions,
+        brand: cjProduct.brand,
+        tags: cjProduct.tags,
+      };
+
+      // Vérifier les doublons
+      const duplicateCheck = await this.duplicatePreventionService.checkCJProductDuplicate(
+        cjProduct.cjProductId || '',
+        cjProduct.productSku || '',
+        {
+          name: cjProduct.name,
+          price: cjProduct.price || 0,
+          description: cjProduct.description || ''
+        }
+      );
+
+      // Créer le produit
+      const importResult = await this.duplicatePreventionService.upsertCJProduct(productData, duplicateCheck);
+      
+      const product = await this.prisma.product.findUnique({
+        where: { id: importResult.productId }
+      });
+
+      // Marquer comme importé dans CJProductStore
+      await this.prisma.cJProductStore.update({
+        where: { id: cjProduct.id },
+        data: { status: 'imported' }
+      });
+
+      // Créer le mapping
+      await this.prisma.cJProductMapping.create({
+        data: {
+          productId: product.id,
+          cjProductId: cjProduct.cjProductId || '',
+          cjSku: cjProduct.productSku || '',
+          lastSyncAt: new Date(),
+        },
+      });
+
+      this.logger.log(`✅ Produit importé avec succès: ${product.id} (${product.name})`);
+
+      return {
+        success: true,
+        message: 'Produit importé avec succès',
+        product
+      };
+
+    } catch (error) {
+      this.logger.error(`❌ Erreur lors de l'import du produit:`, error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Erreur lors de l\'import',
+        error: 'IMPORT_ERROR'
+      };
     }
   }
 }

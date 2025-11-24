@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { CommonModule } from '../common/common.module';
 import { PrismaService } from '../prisma/prisma.service';
 import { CJAPIClient } from './cj-api-client';
 import { CJCategoriesController } from './cj-categories.controller';
@@ -24,6 +25,7 @@ import { CJServicesModule } from './services/cj-services.module';
 @Module({
   imports: [
     ConfigModule,
+    CommonModule, // ✅ Pour DuplicatePreventionService
     CJServicesModule, // 🔧 IMPORT DU MODULE DE SERVICES REFACTORISÉS
   ],
   controllers: [CJDropshippingController, CJWebhookController, CJLogisticsController, CJCountriesController, CJSettingsController, CJOrdersController, CJDisputesController, CJCategoriesController],
