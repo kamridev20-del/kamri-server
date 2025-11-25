@@ -386,12 +386,20 @@ export class StoresService {
     console.log(`🗑️ Suppression du produit ${productId} du magasin CJ`);
 
     try {
+      // Vérifier si le produit existe
       const product = await this.prisma.cJProductStore.findUnique({
         where: { id: productId },
       });
 
       if (!product) {
-        throw new Error('Produit non trouvé dans le magasin');
+        // Si le produit n'existe pas, retourner un résultat indiquant qu'il n'a pas été trouvé
+        // plutôt que de lancer une erreur, pour permettre la suppression en masse de continuer
+        console.warn(`⚠️ Produit ${productId} non trouvé dans le magasin (peut-être déjà supprimé)`);
+        return {
+          success: false,
+          message: 'Produit non trouvé dans le magasin (peut-être déjà supprimé)',
+          notFound: true,
+        };
       }
 
       await this.prisma.cJProductStore.delete({
@@ -413,7 +421,7 @@ export class StoresService {
   /**
    * Supprimer plusieurs produits du magasin CJ en masse
    */
-  async bulkDeleteStoreProducts(storeId: string, ids: string[]): Promise<{ deleted: number; failed: number; errors?: string[] }> {
+  async bulkDeleteStoreProducts(storeId: string, ids: string[]): Promise<{ deleted: number; failed: number; notFound: number; errors?: string[] }> {
     if (storeId !== 'cj-dropshipping') {
       throw new Error(`Magasin ${storeId} non trouvé`);
     }
@@ -422,12 +430,22 @@ export class StoresService {
 
     let deleted = 0;
     let failed = 0;
+    let notFound = 0;
     const errors: string[] = [];
 
     for (const id of ids) {
       try {
-        await this.deleteStoreProduct(storeId, id);
-        deleted++;
+        const result = await this.deleteStoreProduct(storeId, id);
+        if (result.success) {
+          deleted++;
+        } else if ((result as any).notFound) {
+          // Produit non trouvé (peut-être déjà supprimé)
+          notFound++;
+          console.log(`ℹ️ Produit ${id} non trouvé (ignoré)`);
+        } else {
+          failed++;
+          errors.push(`Produit ${id}: ${result.message || 'Erreur inconnue'}`);
+        }
       } catch (error) {
         failed++;
         const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
@@ -436,11 +454,12 @@ export class StoresService {
       }
     }
 
-    console.log(`✅ Suppression en masse terminée: ${deleted} supprimé(s), ${failed} échec(s)`);
+    console.log(`✅ Suppression en masse terminée: ${deleted} supprimé(s), ${notFound} non trouvé(s), ${failed} échec(s)`);
 
     return {
       deleted,
       failed,
+      notFound,
       ...(errors.length > 0 && { errors }),
     };
   }
