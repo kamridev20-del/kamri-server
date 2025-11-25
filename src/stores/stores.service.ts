@@ -375,4 +375,74 @@ export class StoresService {
     throw new Error(`Magasin ${storeId} non trouvé`);
   }
 
+  /**
+   * Supprimer un produit du magasin CJ
+   */
+  async deleteStoreProduct(storeId: string, productId: string) {
+    if (storeId !== 'cj-dropshipping') {
+      throw new Error(`Magasin ${storeId} non trouvé`);
+    }
+
+    console.log(`🗑️ Suppression du produit ${productId} du magasin CJ`);
+
+    try {
+      const product = await this.prisma.cJProductStore.findUnique({
+        where: { id: productId },
+      });
+
+      if (!product) {
+        throw new Error('Produit non trouvé dans le magasin');
+      }
+
+      await this.prisma.cJProductStore.delete({
+        where: { id: productId },
+      });
+
+      console.log(`✅ Produit ${productId} supprimé du magasin CJ avec succès`);
+
+      return {
+        success: true,
+        message: 'Produit supprimé avec succès',
+      };
+    } catch (error) {
+      console.error(`❌ Erreur lors de la suppression du produit ${productId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Supprimer plusieurs produits du magasin CJ en masse
+   */
+  async bulkDeleteStoreProducts(storeId: string, ids: string[]): Promise<{ deleted: number; failed: number; errors?: string[] }> {
+    if (storeId !== 'cj-dropshipping') {
+      throw new Error(`Magasin ${storeId} non trouvé`);
+    }
+
+    console.log(`🗑️ Suppression en masse de ${ids.length} produit(s) du magasin CJ`);
+
+    let deleted = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
+    for (const id of ids) {
+      try {
+        await this.deleteStoreProduct(storeId, id);
+        deleted++;
+      } catch (error) {
+        failed++;
+        const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
+        errors.push(`Produit ${id}: ${errorMessage}`);
+        console.error(`❌ Erreur suppression produit ${id}:`, errorMessage);
+      }
+    }
+
+    console.log(`✅ Suppression en masse terminée: ${deleted} supprimé(s), ${failed} échec(s)`);
+
+    return {
+      deleted,
+      failed,
+      ...(errors.length > 0 && { errors }),
+    };
+  }
+
 }

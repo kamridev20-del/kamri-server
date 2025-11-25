@@ -1,6 +1,7 @@
 import {
     Body,
     Controller,
+    Delete,
     Get,
     Param,
     Post,
@@ -67,5 +68,28 @@ export class StoresController {
   @ApiResponse({ status: 200, description: 'Produits sélectionnés importés' })
   importSelectedProducts(@Param('storeId') storeId: string) {
     return this.storesService.importSelectedProducts(storeId);
+  }
+
+  @Delete(':storeId/products/:productId')
+  @ApiOperation({ summary: 'Supprimer un produit du magasin' })
+  @ApiResponse({ status: 200, description: 'Produit supprimé avec succès' })
+  deleteStoreProduct(
+    @Param('storeId') storeId: string,
+    @Param('productId') productId: string,
+  ) {
+    return this.storesService.deleteStoreProduct(storeId, productId);
+  }
+
+  @Delete(':storeId/products/bulk')
+  @ApiOperation({ summary: 'Supprimer plusieurs produits du magasin en masse' })
+  @ApiResponse({ status: 200, description: 'Produits supprimés avec succès' })
+  bulkDeleteStoreProducts(
+    @Param('storeId') storeId: string,
+    @Body() body: { ids: string[] },
+  ) {
+    if (!body.ids || !Array.isArray(body.ids) || body.ids.length === 0) {
+      throw new Error('Les IDs des produits sont requis');
+    }
+    return this.storesService.bulkDeleteStoreProducts(storeId, body.ids);
   }
 }
