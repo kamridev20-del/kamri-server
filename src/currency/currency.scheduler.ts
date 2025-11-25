@@ -9,8 +9,11 @@ export class CurrencyScheduler implements OnModuleInit {
   constructor(private readonly currencyService: CurrencyService) {}
 
   onModuleInit() {
-    // Mise à jour initiale au démarrage
-    this.updateExchangeRates();
+    // ✅ Mise à jour initiale au démarrage (non bloquante)
+    // On attend quelques secondes pour laisser l'application démarrer complètement
+    setTimeout(() => {
+      this.updateExchangeRates();
+    }, 5000); // Délai de 5 secondes après le démarrage
     
     // Mise à jour toutes les 24 heures (86400000 ms)
     this.updateInterval = setInterval(() => {

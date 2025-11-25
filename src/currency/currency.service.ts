@@ -84,51 +84,75 @@ export class CurrencyService {
 
   /**
    * Récupérer les taux de change depuis l'API externe (Currency Data API)
+   * ✅ Avec mécanisme de retry
    */
-  async fetchExchangeRates(): Promise<Record<string, number> | null> {
-    try {
-      const apiKey = this.configService.get<string>('CURRENCY_API_KEY');
-      if (!apiKey) {
-        this.logger.error('❌ CURRENCY_API_KEY non configurée dans les variables d\'environnement');
-        return null;
-      }
-
-      this.logger.log('🔄 Récupération des taux de change depuis Currency Data API...');
-      
-      // Construire la liste des devises supportées
-      const symbols = SUPPORTED_CURRENCIES.join(',');
-      
-      const response = await axios.get(this.EXCHANGE_API_URL, {
-        params: {
-          base: 'USD',
-          symbols: symbols, // Limiter aux devises supportées
-        },
-        headers: {
-          'apikey': apiKey,
-        },
-        timeout: 10000,
-      });
-
-      if (response.data && response.data.success && response.data.quotes) {
-        this.logger.log('✅ Taux de change récupérés avec succès');
-        
-        // Convertir le format quotes (USDUSD=1.0, USDEUR=0.92) en format simple (EUR=0.92)
-        const rates: Record<string, number> = {};
-        Object.keys(response.data.quotes).forEach((key) => {
-          // key format: "USDEUR" -> extraire "EUR"
-          const currency = key.replace('USD', '');
-          rates[currency] = response.data.quotes[key];
-        });
-        
-        return rates;
-      }
-
-      this.logger.error('❌ Format de réponse API invalide:', response.data);
-      return null;
-    } catch (error: any) {
-      this.logger.error('❌ Erreur lors de la récupération des taux:', error.response?.data || error.message);
+  async fetchExchangeRates(retries = 3): Promise<Record<string, number> | null> {
+    const apiKey = this.configService.get<string>('CURRENCY_API_KEY');
+    if (!apiKey) {
+      this.logger.warn('⚠️ CURRENCY_API_KEY non configurée - les taux de change ne seront pas mis à jour automatiquement');
       return null;
     }
+
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        this.logger.log(`🔄 Récupération des taux de change (tentative ${attempt}/${retries})...`);
+        
+        // Construire la liste des devises supportées
+        const symbols = SUPPORTED_CURRENCIES.join(',');
+        
+        const response = await axios.get(this.EXCHANGE_API_URL, {
+          params: {
+            base: 'USD',
+            symbols: symbols, // Limiter aux devises supportées
+          },
+          headers: {
+            'apikey': apiKey,
+          },
+          timeout: 30000, // ✅ 30 secondes
+        });
+
+        if (response.data && response.data.success && response.data.quotes) {
+          this.logger.log('✅ Taux de change récupérés avec succès');
+          
+          // Convertir le format quotes (USDUSD=1.0, USDEUR=0.92) en format simple (EUR=0.92)
+          const rates: Record<string, number> = {};
+          Object.keys(response.data.quotes).forEach((key) => {
+            // key format: "USDEUR" -> extraire "EUR"
+            const currency = key.replace('USD', '');
+            rates[currency] = response.data.quotes[key];
+          });
+          
+          return rates;
+        }
+
+        this.logger.warn('⚠️ Format de réponse API invalide:', response.data);
+        
+        // Si c'est la dernière tentative, retourner null
+        if (attempt === retries) {
+          return null;
+        }
+        
+        // Attendre avant de réessayer (backoff exponentiel)
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+        
+      } catch (error: any) {
+        const errorMessage = error.response?.data || error.message;
+        
+        if (attempt === retries) {
+          this.logger.error(`❌ Échec après ${retries} tentatives: ${errorMessage}`);
+          return null;
+        }
+        
+        this.logger.warn(`⚠️ Tentative ${attempt}/${retries} échouée: ${errorMessage}`);
+        
+        // Attendre avant de réessayer (backoff exponentiel: 2s, 4s, 8s)
+        const delayMs = Math.pow(2, attempt) * 1000;
+        this.logger.log(`⏳ Nouvelle tentative dans ${delayMs / 1000}s...`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    }
+
+    return null;
   }
 
   /**
