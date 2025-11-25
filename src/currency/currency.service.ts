@@ -136,13 +136,23 @@ export class CurrencyService {
    */
   async updateExchangeRates(): Promise<{ success: boolean; updated: number; error?: string }> {
     try {
+      // Vérifier d'abord si la clé API est configurée
+      const apiKey = this.configService.get<string>('CURRENCY_API_KEY');
+      if (!apiKey) {
+        return {
+          success: false,
+          updated: 0,
+          error: 'CURRENCY_API_KEY non configurée dans les variables d\'environnement',
+        };
+      }
+
       const rates = await this.fetchExchangeRates();
       
       if (!rates) {
         return {
           success: false,
           updated: 0,
-          error: 'Impossible de récupérer les taux de change',
+          error: 'Impossible de récupérer les taux de change depuis l\'API',
         };
       }
 

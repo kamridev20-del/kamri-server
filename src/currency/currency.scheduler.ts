@@ -31,11 +31,21 @@ export class CurrencyScheduler implements OnModuleInit {
    */
   async updateExchangeRates() {
     this.logger.log('🔄 Mise à jour automatique des taux de change...');
-    const result = await this.currencyService.updateExchangeRates();
-    if (result.success) {
-      this.logger.log(`✅ ${result.updated} taux de change mis à jour avec succès`);
-    } else {
-      this.logger.error(`❌ Erreur lors de la mise à jour: ${result.error}`);
+    try {
+      const result = await this.currencyService.updateExchangeRates();
+      if (result.success) {
+        this.logger.log(`✅ ${result.updated} taux de change mis à jour avec succès`);
+      } else {
+        // Ne pas logger comme erreur si c'est juste la clé API manquante (c'est un avertissement)
+        if (result.error?.includes('CURRENCY_API_KEY') || result.error?.includes('non configurée')) {
+          this.logger.warn(`⚠️ Mise à jour des taux de change ignorée: ${result.error}`);
+          this.logger.warn(`💡 Pour activer la mise à jour automatique, configurez CURRENCY_API_KEY dans vos variables d'environnement`);
+        } else {
+          this.logger.error(`❌ Erreur lors de la mise à jour: ${result.error}`);
+        }
+      }
+    } catch (error) {
+      this.logger.error(`❌ Erreur lors de la mise à jour des taux de change: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 }
