@@ -632,4 +632,200 @@ export class CJWebhookService {
       };
     }
   }
+
+  /**
+   * Récupérer les webhooks en attente (produits non importés)
+   */
+  async getPendingWebhooks(type?: string, page: number = 1, limit: number = 50) {
+    try {
+      const where: any = {
+        action: 'pending',
+        type: type ? type.toUpperCase() : undefined,
+      };
+
+      if (!where.type) delete where.type;
+
+      const skip = (page - 1) * limit;
+
+      const [webhooks, total] = await Promise.all([
+        this.prisma.cJWebhookLog.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: limit,
+        }),
+        this.prisma.cJWebhookLog.count({ where }),
+      ]);
+
+      const products = webhooks.map(webhook => {
+        try {
+          const payload = JSON.parse(webhook.payload);
+          const params = payload.params || payload;
+          
+          if (webhook.type === 'PRODUCT') {
+            return {
+              webhookId: webhook.id,
+              messageId: webhook.messageId,
+              type: webhook.type,
+              productId: params.pid,
+              name: params.productNameEn || params.productName || `Produit CJ ${params.pid}`,
+              price: params.productSellPrice || 0,
+              image: params.productImage || '',
+              category: params.categoryName || '',
+              sku: params.productSku || '',
+              createdAt: webhook.createdAt,
+              params: params,
+            };
+          } else if (webhook.type === 'VARIANT') {
+            const pid = (params as any).pid || '';
+            return {
+              webhookId: webhook.id,
+              messageId: webhook.messageId,
+              type: webhook.type,
+              productId: pid,
+              variantId: params.vid,
+              name: params.variantName || `Variante ${params.vid}`,
+              price: params.variantSellPrice || 0,
+              image: params.variantImage || '',
+              createdAt: webhook.createdAt,
+              params: params,
+            };
+          }
+          
+          return null;
+        } catch (error) {
+          this.logger.error(`Erreur parsing payload webhook ${webhook.id}:`, error);
+          return null;
+        }
+      }).filter(Boolean);
+
+      return {
+        products,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+    } catch (error) {
+      this.logger.error('Erreur récupération webhooks en attente:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Importer un produit depuis un webhook en attente
+   */
+  async importFromPendingWebhook(webhookLogId: string, categoryId?: string) {
+    try {
+      const webhook = await this.prisma.cJWebhookLog.findUnique({
+        where: { id: webhookLogId },
+      });
+
+      if (!webhook) {
+        throw new Error('Webhook non trouvé');
+      }
+
+      if (webhook.action !== 'pending') {
+        throw new Error(`Ce webhook a déjà été traité (action: ${webhook.action})`);
+      }
+
+      const payload = JSON.parse(webhook.payload);
+      const params = payload.params || payload;
+
+      if (webhook.type === 'PRODUCT') {
+        let productName = params.productNameEn || params.productName || `Produit CJ ${params.pid}`;
+        try {
+          if (productName.startsWith('[') && productName.endsWith(']')) {
+            const parsed = JSON.parse(productName);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              productName = parsed[0];
+            }
+          }
+        } catch (e) {
+          // Ignorer
+        }
+
+        const price = typeof params.productSellPrice === 'string' 
+          ? parseFloat(params.productSellPrice) || 0
+          : (params.productSellPrice || 0);
+
+        const storeProductData = {
+          cjProductId: params.pid,
+          name: productName,
+          description: params.productDescription || '',
+          price: price,
+          originalPrice: price,
+          image: params.productImage || '',
+          category: params.categoryName || '',
+          status: 'available',
+          productSku: params.productSku || '',
+        };
+
+        const storeResult = await this.duplicatePreventionService.upsertCJStoreProduct(storeProductData);
+
+        await this.prisma.cJWebhookLog.update({
+          where: { id: webhookLogId },
+          data: { action: 'imported' },
+        });
+
+        this.logger.log(`✅ Produit ${params.pid} importé depuis webhook vers CJProductStore`);
+
+        return {
+          success: true,
+          message: 'Produit importé avec succès dans le magasin',
+          productId: storeResult.productId,
+          cjProductId: params.pid,
+        };
+      } else if (webhook.type === 'VARIANT') {
+        throw new Error('Les variants doivent être importés via leur produit parent. Recherchez le produit avec le PID correspondant.');
+      }
+
+      throw new Error(`Type de webhook non supporté pour l'import: ${webhook.type}`);
+    } catch (error) {
+      this.logger.error(`Erreur import depuis webhook ${webhookLogId}:`, error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Erreur lors de l\'import',
+      };
+    }
+  }
+
+  /**
+   * Ignorer un produit depuis un webhook en attente
+   */
+  async ignorePendingWebhook(webhookLogId: string) {
+    try {
+      const webhook = await this.prisma.cJWebhookLog.findUnique({
+        where: { id: webhookLogId },
+      });
+
+      if (!webhook) {
+        throw new Error('Webhook non trouvé');
+      }
+
+      if (webhook.action !== 'pending') {
+        throw new Error(`Ce webhook a déjà été traité (action: ${webhook.action})`);
+      }
+
+      await this.prisma.cJWebhookLog.update({
+        where: { id: webhookLogId },
+        data: { action: 'ignored' },
+      });
+
+      this.logger.log(`✅ Webhook ${webhookLogId} ignoré`);
+
+      return {
+        success: true,
+        message: 'Produit ignoré avec succès',
+      };
+    } catch (error) {
+      this.logger.error(`Erreur ignore webhook ${webhookLogId}:`, error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Erreur lors de l\'ignore',
+      };
+    }
+  }
 }

@@ -140,28 +140,63 @@ export class CJWebhookService {
       // Nettoyer la description
       const description = this.cleanProductDescription(params.productDescription || '');
       
-      // ✅ NOUVEAU COMPORTEMENT : Stocker dans CJProductStore au lieu de créer directement dans Product
-      // L'utilisateur décidera ensuite quels produits importer depuis le magasin CJ
-      const storeProductData = {
-        cjProductId: params.pid,
-        name: productName,
-        description: description,
-        price: price,
-        originalPrice: price, // Utiliser le prix de vente comme prix original par défaut
-        image: params.productImage || '',
-        category: params.categoryName || '', // ✅ Stocker la catégorie externe
-        status: 'available', // ✅ Toujours disponible dans le magasin
-        productSku: params.productSku || '',
-        // Champs supplémentaires si disponibles
-        productProperty1: params.productProperty1 || '',
-        productProperty2: params.productProperty2 || '',
-        productProperty3: params.productProperty3 || '',
-      };
-
-      const storeResult = await this.duplicatePreventionService.upsertCJStoreProduct(storeProductData);
+      // ✅ NOUVEAU COMPORTEMENT : Stocker le webhook dans CJWebhookLog avec action: 'pending'
+      // L'utilisateur pourra voir et décider d'importer ou non depuis la page webhooks
       
-      this.logger.log(`✅ Produit ${storeResult.isNew ? 'ajouté' : 'mis à jour'} dans le magasin CJ: ${params.pid}`);
-      this.logger.log(`📋 Action requise: L'utilisateur peut maintenant importer ce produit depuis la page "Magasin CJ"`);
+      // Vérifier si le produit existe déjà dans CJProductStore
+      const existingStoreProduct = await this.prisma.cJProductStore.findFirst({
+        where: { cjProductId: params.pid }
+      });
+
+      if (existingStoreProduct) {
+        // ✅ Produit trouvé dans le magasin - Mettre à jour les informations
+        const storeProductData = {
+          cjProductId: params.pid,
+          name: productName,
+          description: description,
+          price: price,
+          originalPrice: price,
+          image: params.productImage || '',
+          category: params.categoryName || '',
+          status: existingStoreProduct.status, // Conserver le statut existant
+          productSku: params.productSku || '',
+          // Champs supplémentaires si disponibles
+          productProperty1: params.productProperty1 || '',
+          productProperty2: params.productProperty2 || '',
+          productProperty3: params.productProperty3 || '',
+        };
+
+        await this.duplicatePreventionService.upsertCJStoreProduct(storeProductData);
+        this.logger.log(`✅ Produit mis à jour dans le magasin CJ: ${params.pid}`);
+
+        return {
+          success: true,
+          messageId,
+          type: 'PRODUCT',
+          processedAt: new Date(),
+          changes: params.fields,
+          message: `Produit mis à jour dans le magasin CJ`
+        };
+      }
+
+      // ✅ Produit non trouvé - Stocker dans CJWebhookLog avec action: 'pending'
+      // L'utilisateur pourra voir ce produit sur la page webhooks et décider de l'importer
+      await this.prisma.cJWebhookLog.upsert({
+        where: { messageId },
+        update: {
+          payload: JSON.stringify({ type: 'PRODUCT', params }),
+          action: 'pending', // Marquer comme en attente
+        },
+        create: {
+          type: 'PRODUCT',
+          messageId,
+          payload: JSON.stringify({ type: 'PRODUCT', params }),
+          processed: false,
+          action: 'pending', // En attente d'import par l'utilisateur
+        }
+      });
+
+      this.logger.log(`📋 Produit ${params.pid} stocké en attente dans CJWebhookLog. Visible sur la page webhooks pour import manuel.`);
 
       return {
         success: true,
@@ -169,7 +204,7 @@ export class CJWebhookService {
         type: 'PRODUCT',
         processedAt: new Date(),
         changes: params.fields,
-        message: `Produit stocké dans le magasin CJ (${storeResult.isNew ? 'nouveau' : 'mis à jour'})`
+        message: `Produit en attente d'import. Visible sur la page webhooks.`
       };
 
     } catch (error) {
@@ -282,66 +317,32 @@ export class CJWebhookService {
             message: `Variante mise à jour dans le magasin CJ. Le produit peut être importé depuis la page "Magasin CJ".`
           };
         } else {
-          // ✅ Si le produit n'existe pas dans CJProductStore, le créer avec les infos de la variante
-          this.logger.log(`📦 Produit ${pid} introuvable, création dans CJProductStore depuis la variante...`);
-          
-          try {
-            // Extraire le nom du produit depuis variantName
-            let productName = params.variantName || `Produit CJ ${pid}`;
-            productName = productName
-              .replace(/\s*(2 Style|AU|US|EU|UK|Style)\s*$/i, '')
-              .trim();
-            
-            // Créer le produit dans CJProductStore
-            const storeProductData = {
-              cjProductId: pid,
-              name: this.cleanProductName(productName),
-              description: `Produit créé automatiquement depuis webhook VARIANT (PID: ${pid})`,
-              price: params.variantSellPrice 
-                ? (typeof params.variantSellPrice === 'string' ? parseFloat(params.variantSellPrice) : params.variantSellPrice)
-                : 0,
-              originalPrice: params.variantSellPrice 
-                ? (typeof params.variantSellPrice === 'string' ? parseFloat(params.variantSellPrice) : params.variantSellPrice)
-                : 0,
-              image: params.variantImage || '',
-              category: '', // Pas de catégorie disponible depuis la variante seule
-              status: 'available',
-              productSku: params.variantSku || '',
-              variants: JSON.stringify([{
-                vid: params.vid,
-                variantId: params.vid,
-                variantName: params.variantName,
-                variantNameEn: params.variantName,
-                variantSku: params.variantSku,
-                variantSellPrice: params.variantSellPrice,
-                variantImage: params.variantImage,
-                variantStock: params.variantStock || 0,
-                ...params
-              }])
-            };
+          // ✅ NOUVEAU COMPORTEMENT : Stocker dans CJWebhookLog avec action: 'pending'
+          // L'utilisateur pourra voir ce produit sur la page webhooks et décider de l'importer
+          await this.prisma.cJWebhookLog.upsert({
+            where: { messageId },
+            update: {
+              payload: JSON.stringify({ type: 'VARIANT', params }),
+              action: 'pending', // Marquer comme en attente
+            },
+            create: {
+              type: 'VARIANT',
+              messageId,
+              payload: JSON.stringify({ type: 'VARIANT', params }),
+              processed: false,
+              action: 'pending', // En attente d'import par l'utilisateur
+            }
+          });
 
-            const storeResult = await this.duplicatePreventionService.upsertCJStoreProduct(storeProductData);
-            
-            this.logger.log(`✅ Produit créé dans CJProductStore: ${pid} (${storeResult.isNew ? 'nouveau' : 'mis à jour'})`);
-            this.logger.log(`📋 Action requise: L'utilisateur peut maintenant importer ce produit depuis la page "Magasin CJ"`);
-            
-            return {
-              success: true,
-              messageId,
-              type: 'VARIANT',
-              processedAt: new Date(),
-              message: `Produit créé dans le magasin CJ. Vous pouvez l'importer depuis la page "Magasin CJ".`
-            };
-          } catch (createError: any) {
-            this.logger.error(`❌ Erreur création produit dans CJProductStore pour PID ${pid}:`, createError.message);
-            return {
-              success: false,
-              messageId,
-              type: 'VARIANT',
-              processedAt: new Date(),
-              error: `Impossible de créer le produit dans le magasin CJ. Erreur: ${createError.message}`
-            };
-          }
+          this.logger.log(`📋 Produit ${pid} (variante ${params.vid}) stocké en attente dans CJWebhookLog. Visible sur la page webhooks pour import manuel.`);
+          
+          return {
+            success: true,
+            messageId,
+            type: 'VARIANT',
+            processedAt: new Date(),
+            message: `Produit en attente d'import. Visible sur la page webhooks.`
+          };
         }
       }
 
@@ -1330,5 +1331,215 @@ export class CJWebhookService {
       .trim();
     
     return cleaned;
+  }
+
+  /**
+   * Récupérer les webhooks en attente (produits non importés)
+   */
+  async getPendingWebhooks(type?: string, page: number = 1, limit: number = 50) {
+    try {
+      const where: any = {
+        action: 'pending',
+        type: type ? type.toUpperCase() : undefined,
+      };
+
+      // Nettoyer les filtres undefined
+      if (!where.type) delete where.type;
+
+      const skip = (page - 1) * limit;
+
+      const [webhooks, total] = await Promise.all([
+        this.prisma.cJWebhookLog.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: limit,
+        }),
+        this.prisma.cJWebhookLog.count({ where }),
+      ]);
+
+      // Parser les payloads et extraire les données des produits
+      const products = webhooks.map(webhook => {
+        try {
+          const payload = JSON.parse(webhook.payload);
+          const params = payload.params || payload;
+          
+          // Extraire les informations du produit selon le type
+          if (webhook.type === 'PRODUCT') {
+            const productParams = params as CJProductParams;
+            return {
+              webhookId: webhook.id,
+              messageId: webhook.messageId,
+              type: webhook.type,
+              productId: productParams.pid,
+              name: productParams.productNameEn || productParams.productName || `Produit CJ ${productParams.pid}`,
+              price: productParams.productSellPrice || 0,
+              image: productParams.productImage || '',
+              category: productParams.categoryName || '',
+              sku: productParams.productSku || '',
+              createdAt: webhook.createdAt,
+              params: productParams,
+            };
+          } else if (webhook.type === 'VARIANT') {
+            const variantParams = params as CJVariantParams;
+            const pid = (variantParams as any).pid || '';
+            return {
+              webhookId: webhook.id,
+              messageId: webhook.messageId,
+              type: webhook.type,
+              productId: pid,
+              variantId: variantParams.vid,
+              name: variantParams.variantName || `Variante ${variantParams.vid}`,
+              price: variantParams.variantSellPrice || 0,
+              image: variantParams.variantImage || '',
+              createdAt: webhook.createdAt,
+              params: variantParams,
+            };
+          }
+          
+          return null;
+        } catch (error) {
+          this.logger.error(`Erreur parsing payload webhook ${webhook.id}:`, error);
+          return null;
+        }
+      }).filter(Boolean);
+
+      return {
+        products,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+    } catch (error) {
+      this.logger.error('Erreur récupération webhooks en attente:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Importer un produit depuis un webhook en attente
+   */
+  async importFromPendingWebhook(webhookLogId: string, categoryId?: string) {
+    try {
+      const webhook = await this.prisma.cJWebhookLog.findUnique({
+        where: { id: webhookLogId },
+      });
+
+      if (!webhook) {
+        throw new Error('Webhook non trouvé');
+      }
+
+      if (webhook.action !== 'pending') {
+        throw new Error(`Ce webhook a déjà été traité (action: ${webhook.action})`);
+      }
+
+      const payload = JSON.parse(webhook.payload);
+      const params = payload.params || payload;
+
+      if (webhook.type === 'PRODUCT') {
+        const productParams = params as CJProductParams;
+        
+        // Nettoyer le nom du produit
+        let productName = productParams.productNameEn || productParams.productName || `Produit CJ ${productParams.pid}`;
+        try {
+          if (productName.startsWith('[') && productName.endsWith(']')) {
+            const parsed = JSON.parse(productName);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              productName = parsed[0];
+            }
+          }
+        } catch (e) {
+          // Ignorer
+        }
+        productName = this.cleanProductName(productName);
+
+        const price = typeof productParams.productSellPrice === 'string' 
+          ? parseFloat(productParams.productSellPrice) || 0
+          : (productParams.productSellPrice || 0);
+
+        // Créer le produit dans CJProductStore
+        const storeProductData = {
+          cjProductId: productParams.pid,
+          name: productName,
+          description: this.cleanProductDescription(productParams.productDescription || ''),
+          price: price,
+          originalPrice: price,
+          image: productParams.productImage || '',
+          category: productParams.categoryName || '',
+          status: 'available',
+          productSku: productParams.productSku || '',
+        };
+
+        const storeResult = await this.duplicatePreventionService.upsertCJStoreProduct(storeProductData);
+
+        // Mettre à jour le webhook
+        await this.prisma.cJWebhookLog.update({
+          where: { id: webhookLogId },
+          data: { action: 'imported' },
+        });
+
+        this.logger.log(`✅ Produit ${productParams.pid} importé depuis webhook vers CJProductStore`);
+
+        return {
+          success: true,
+          message: 'Produit importé avec succès dans le magasin',
+          productId: storeResult.productId,
+          cjProductId: productParams.pid,
+        };
+      } else if (webhook.type === 'VARIANT') {
+        // Pour les variants, on ne peut pas créer un produit complet
+        // On retourne une erreur ou on suggère d'importer le produit parent
+        throw new Error('Les variants doivent être importés via leur produit parent. Recherchez le produit avec le PID correspondant.');
+      }
+
+      throw new Error(`Type de webhook non supporté pour l'import: ${webhook.type}`);
+    } catch (error) {
+      this.logger.error(`Erreur import depuis webhook ${webhookLogId}:`, error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Erreur lors de l\'import',
+      };
+    }
+  }
+
+  /**
+   * Ignorer un produit depuis un webhook en attente
+   */
+  async ignorePendingWebhook(webhookLogId: string) {
+    try {
+      const webhook = await this.prisma.cJWebhookLog.findUnique({
+        where: { id: webhookLogId },
+      });
+
+      if (!webhook) {
+        throw new Error('Webhook non trouvé');
+      }
+
+      if (webhook.action !== 'pending') {
+        throw new Error(`Ce webhook a déjà été traité (action: ${webhook.action})`);
+      }
+
+      // Mettre à jour le webhook
+      await this.prisma.cJWebhookLog.update({
+        where: { id: webhookLogId },
+        data: { action: 'ignored' },
+      });
+
+      this.logger.log(`✅ Webhook ${webhookLogId} ignoré`);
+
+      return {
+        success: true,
+        message: 'Produit ignoré avec succès',
+      };
+    } catch (error) {
+      this.logger.error(`Erreur ignore webhook ${webhookLogId}:`, error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Erreur lors de l\'ignore',
+      };
+    }
   }
 }

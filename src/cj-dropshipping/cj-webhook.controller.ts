@@ -185,4 +185,44 @@ export class CJWebhookController {
     this.logger.log(`📦 Import manuel du produit: ${cjProductStoreId}`);
     return this.cjWebhookService.importProductFromStore(cjProductStoreId, body?.categoryId);
   }
+
+  /**
+   * Récupérer les webhooks en attente (produits non importés)
+   */
+  @Get('pending')
+  @HttpCode(HttpStatus.OK)
+  async getPendingWebhooks(
+    @Query('type') type?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number
+  ) {
+    this.logger.log('📋 Récupération des webhooks en attente');
+    return this.cjWebhookService.getPendingWebhooks(type, page, limit);
+  }
+
+  /**
+   * Importer un produit depuis un webhook en attente
+   * @param webhookLogId ID du webhook log
+   * @param categoryId ID de la catégorie (optionnel)
+   */
+  @Post('pending/:webhookLogId/import')
+  @HttpCode(HttpStatus.OK)
+  async importFromPendingWebhook(
+    @Param('webhookLogId') webhookLogId: string,
+    @Body() body?: { categoryId?: string }
+  ) {
+    this.logger.log(`📦 Import depuis webhook en attente: ${webhookLogId}`);
+    return this.cjWebhookService.importFromPendingWebhook(webhookLogId, body?.categoryId);
+  }
+
+  /**
+   * Ignorer un produit depuis un webhook en attente
+   * @param webhookLogId ID du webhook log
+   */
+  @Post('pending/:webhookLogId/ignore')
+  @HttpCode(HttpStatus.OK)
+  async ignorePendingWebhook(@Param('webhookLogId') webhookLogId: string) {
+    this.logger.log(`❌ Ignorer webhook en attente: ${webhookLogId}`);
+    return this.cjWebhookService.ignorePendingWebhook(webhookLogId);
+  }
 }

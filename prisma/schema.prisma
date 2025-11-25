@@ -559,15 +559,17 @@ model WebhookLog {
 // Garder l'ancien modèle pour compatibilité (à supprimer plus tard)
 model CJWebhookLog {
   id        String   @id @default(cuid())
-  type      String // PRODUCT, STOCK, ORDER, LOGISTICS
+  type      String // PRODUCT, STOCK, ORDER, LOGISTICS, VARIANT
   messageId String   @unique
   payload   String   @db.Text // JSON string
   processed Boolean  @default(false)
   error     String?  @db.Text
+  action    String?  @default("pending") // pending, imported, ignored - Pour les produits en attente d'import
   createdAt DateTime @default(now())
 
   @@index([type, processed])
   @@index([messageId])
+  @@index([type, action]) // Index pour filtrer les produits en attente
   @@map("cj_webhook_logs")
 }
 
