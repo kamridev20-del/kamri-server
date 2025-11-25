@@ -155,6 +155,17 @@ export class ProductsController {
     return this.productsService.remove(id);
   }
 
+  @Delete('bulk/delete')
+  @ApiOperation({ summary: 'Delete multiple products' })
+  @ApiResponse({ status: 200, description: 'Products deleted successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid request' })
+  async bulkDelete(@Body() body: { ids: string[] }) {
+    if (!body.ids || !Array.isArray(body.ids) || body.ids.length === 0) {
+      throw new Error('Les IDs des produits sont requis');
+    }
+    return this.productsService.bulkDelete(body.ids);
+  }
+
   @Get('admin/ready-for-validation')
   @ApiOperation({ summary: 'Get products ready for validation (with category mapping)' })
   @ApiResponse({ status: 200, description: 'Products ready for validation retrieved successfully' })

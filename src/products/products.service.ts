@@ -206,9 +206,71 @@ export class ProductsService {
   }
 
   async remove(id: string) {
-    return this.prisma.product.delete({
-      where: { id },
-    });
+    this.logger.log(`🗑️ Suppression du produit ${id}`);
+    
+    try {
+      // Vérifier que le produit existe
+      const product = await this.prisma.product.findUnique({
+        where: { id },
+      });
+
+      if (!product) {
+        throw new Error('Produit non trouvé');
+      }
+
+      // Supprimer le produit (les relations seront supprimées en cascade grâce à onDelete: Cascade dans le schéma)
+      // Les relations suivantes seront automatiquement supprimées :
+      // - ProductVariant (onDelete: Cascade)
+      // - Image (onDelete: Cascade)
+      // - CartItem (onDelete: Cascade)
+      // - OrderItem (si pas de commande associée)
+      // - Review (onDelete: Cascade)
+      // - Wishlist (onDelete: Cascade)
+      // - CJProductMapping (onDelete: Cascade)
+      // - ProductUpdateNotification (si existe)
+      
+      const deletedProduct = await this.prisma.product.delete({
+        where: { id },
+      });
+
+      this.logger.log(`✅ Produit ${id} supprimé avec succès`);
+      
+      return deletedProduct;
+    } catch (error) {
+      this.logger.error(`❌ Erreur lors de la suppression du produit ${id}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Supprimer plusieurs produits en masse
+   */
+  async bulkDelete(ids: string[]): Promise<{ deleted: number; failed: number; errors?: string[] }> {
+    this.logger.log(`🗑️ Suppression en masse de ${ids.length} produit(s)`);
+    
+    let deleted = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
+    for (const id of ids) {
+      try {
+        await this.remove(id);
+        deleted++;
+      } catch (error) {
+        failed++;
+        const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
+        errors.push(`Produit ${id}: ${errorMessage}`);
+        this.logger.error(`❌ Erreur suppression produit ${id}:`, errorMessage);
+      }
+    }
+
+    this.logger.log(`✅ Suppression en masse terminée: ${deleted} supprimé(s), ${failed} échec(s)`);
+
+    return {
+      deleted,
+      failed,
+      ...(errors.length > 0 && { errors }),
+    };
   }
 
   async approve(id: string) {
