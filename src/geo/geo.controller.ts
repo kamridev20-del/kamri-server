@@ -1,13 +1,17 @@
 import { Controller, Get, Post, Body, Query, Req, Logger } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiQuery } from '@nestjs/swagger';
 import { GeoLocationService, GeoLocationResult } from './geo.service';
+import { CurrencyService } from '../currency/currency.service';
 
 @ApiTags('geo')
 @Controller('api/geo')
 export class GeoController {
   private readonly logger = new Logger(GeoController.name);
 
-  constructor(private readonly geoService: GeoLocationService) {}
+  constructor(
+    private readonly geoService: GeoLocationService,
+    private readonly currencyService: CurrencyService,
+  ) {}
 
   @Get('detect-country')
   @ApiOperation({ summary: 'Détecte le pays depuis l\'adresse IP' })
@@ -34,7 +38,7 @@ export class GeoController {
 
   @Post('set-country')
   @ApiOperation({ summary: 'Définit manuellement le pays du client' })
-  async setCountry(@Body() body: { countryCode: string }): Promise<{ success: boolean; countryCode: string; countryName: string } | { error: string }> {
+  async setCountry(@Body() body: { countryCode: string }): Promise<{ success: boolean; countryCode: string; countryName: string; currency: string } | { error: string }> {
     try {
       if (!body.countryCode) {
         return { error: 'Code pays requis' };
@@ -45,11 +49,13 @@ export class GeoController {
       }
 
       const countryName = this.geoService.getCountryName(body.countryCode);
+      const currency = this.currencyService.getCurrencyFromCountry(body.countryCode);
 
       return {
         success: true,
         countryCode: body.countryCode.toUpperCase(),
         countryName,
+        currency, // ✅ Retourner la devise correspondante
       };
     } catch (error: any) {
       this.logger.error(`❌ Erreur définition pays: ${error.message}`);
