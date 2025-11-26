@@ -833,6 +833,12 @@ export class CJAPIClient {
       
       // Vérifier si l'API retourne une erreur
       if (response.code !== 200 || !response.result) {
+        // ✅ Cas spécial : produit retiré du catalogue (code 1602002)
+        if (response.code === 1602002) {
+          this.logger.warn(`⚠️ Produit ${pid} retiré du catalogue CJ Dropshipping`);
+          throw new Error(`PRODUCT_REMOVED:${pid}:${response.message}`);
+        }
+        
         this.logger.error(`❌ API CJ a retourné une erreur: code=${response.code}, result=${response.result}, message=${response.message}`);
         throw new Error(response.message || `Produit ${pid} non trouvé dans l'API CJ (code: ${response.code})`);
       }

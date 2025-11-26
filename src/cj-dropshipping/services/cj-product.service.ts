@@ -749,6 +749,13 @@ export class CJProductService {
       return details;
       
     } catch (error) {
+      // ✅ Gérer le cas spécifique du produit retiré du catalogue
+      if (error instanceof Error && error.message.startsWith('PRODUCT_REMOVED:')) {
+        const [, pid, message] = error.message.split(':');
+        this.logger.warn(`⚠️ Produit ${productId} retiré du catalogue CJ`);
+        throw new Error(`PRODUCT_REMOVED:${message}`);
+      }
+      
       this.logger.error(`Erreur lors de la récupération des détails du produit ${productId}:`, error);
       throw error;
     }

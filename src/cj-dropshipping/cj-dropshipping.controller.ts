@@ -190,6 +190,7 @@ export class CJDropshippingController {
   @Get('products/:pid/details')
   @ApiOperation({ summary: 'Obtenir les détails complets d\'un produit CJ' })
   @ApiResponse({ status: 200, description: 'Détails du produit avec variants, stock, images' })
+  @ApiResponse({ status: 410, description: 'Produit retiré du catalogue CJ Dropshipping' })
   async getProductDetails(@Param('pid') pid: string) {
     this.logger.log('🔍 === DÉBUT CONTROLLER getProductDetails ===');
     this.logger.log('📝 PID:', pid);
@@ -200,6 +201,22 @@ export class CJDropshippingController {
       this.logger.log('🔍 === FIN CONTROLLER getProductDetails ===');
       return result;
     } catch (error) {
+      // ✅ Gérer le cas spécifique du produit retiré
+      if (error instanceof Error && error.message.startsWith('PRODUCT_REMOVED:')) {
+        const message = error.message.replace('PRODUCT_REMOVED:', '');
+        this.logger.warn(`⚠️ Produit ${pid} retiré du catalogue`);
+        throw new HttpException(
+          {
+            statusCode: 410,
+            error: 'Gone',
+            message: `Ce produit a été retiré du catalogue CJ Dropshipping`,
+            details: message,
+            pid: pid,
+          },
+          HttpStatus.GONE
+        );
+      }
+      
       this.logger.error('❌ === ERREUR CONTROLLER getProductDetails ===');
       this.logger.error('💥 Erreur:', error);
       this.logger.error('🔍 === FIN ERREUR CONTROLLER getProductDetails ===');
@@ -210,6 +227,7 @@ export class CJDropshippingController {
   @Get('products/:pid/details-with-reviews')
   @ApiOperation({ summary: 'Obtenir les détails complets d\'un produit CJ avec tous ses reviews' })
   @ApiResponse({ status: 200, description: 'Détails du produit avec tous les reviews paginés' })
+  @ApiResponse({ status: 410, description: 'Produit retiré du catalogue CJ Dropshipping' })
   async getProductDetailsWithReviews(@Param('pid') pid: string) {
     this.logger.log('🔍 === DÉBUT CONTROLLER getProductDetailsWithReviews ===');
     this.logger.log('📝 PID:', pid);
@@ -220,6 +238,22 @@ export class CJDropshippingController {
       this.logger.log('🔍 === FIN CONTROLLER getProductDetailsWithReviews ===');
       return result;
     } catch (error) {
+      // ✅ Gérer le cas spécifique du produit retiré
+      if (error instanceof Error && error.message.startsWith('PRODUCT_REMOVED:')) {
+        const message = error.message.replace('PRODUCT_REMOVED:', '');
+        this.logger.warn(`⚠️ Produit ${pid} retiré du catalogue`);
+        throw new HttpException(
+          {
+            statusCode: 410,
+            error: 'Gone',
+            message: `Ce produit a été retiré du catalogue CJ Dropshipping`,
+            details: message,
+            pid: pid,
+          },
+          HttpStatus.GONE
+        );
+      }
+      
       this.logger.error('❌ === ERREUR CONTROLLER getProductDetailsWithReviews ===');
       this.logger.error('💥 Erreur:', error);
       this.logger.error('🔍 === FIN ERREUR CONTROLLER getProductDetailsWithReviews ===');
