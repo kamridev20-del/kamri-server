@@ -37,14 +37,15 @@ export class ProductsService {
   }
 
   // ✅ Synchroniser les reviews CJ en arrière-plan après l'import
-  private async syncProductReviewsInBackground(productId: string, cjProductId: string): Promise<void> {
-    // Lancer en arrière-plan sans bloquer
-    setImmediate(async () => {
+  private syncProductReviewsInBackground(productId: string, cjProductId: string): void {
+    // Lancer en arrière-plan sans bloquer avec setTimeout
+    setTimeout(async () => {
       try {
-        this.logger.log(`🔄 Synchronisation des reviews pour produit ${productId} (CJ: ${cjProductId})...`);
+        this.logger.log(`🔄 [REVIEWS-SYNC] Démarrage pour produit ${productId} (CJ: ${cjProductId})`);
         
-        // Récupérer les reviews depuis l'API CJ
-        const reviews = await this.cjApiClient.getAllProductReviews(cjProductId);
+        // Récupérer les reviews depuis l'API CJ via getProductReviews
+        const reviewsResponse = await this.cjApiClient.getProductReviews(cjProductId, 1, 100);
+        const reviews = reviewsResponse?.list || [];
         
         if (reviews && reviews.length > 0) {
           const { rating, count } = this.calculateRatingFromReviews(reviews);
@@ -59,14 +60,24 @@ export class ProductsService {
             }
           });
           
-          this.logger.log(`✅ ${count} reviews synchronisés pour produit ${productId} - Rating: ${rating}/5`);
+          this.logger.log(`✅ [REVIEWS-SYNC] ${count} avis synchronisés pour ${productId} - Rating: ${rating}/5`);
         } else {
-          this.logger.log(`ℹ️ Aucun avis disponible pour produit ${productId}`);
+          this.logger.log(`ℹ️ [REVIEWS-SYNC] Aucun avis disponible pour ${productId}`);
+          
+          // Mettre à jour avec 0 avis pour éviter de retenter
+          await this.prisma.product.update({
+            where: { id: productId },
+            data: {
+              cjReviews: '[]',
+              rating: 0,
+              reviewsCount: 0
+            }
+          });
         }
       } catch (error) {
-        this.logger.error(`❌ Erreur synchronisation reviews pour produit ${productId}:`, error.message);
+        this.logger.error(`❌ [REVIEWS-SYNC] Erreur pour ${productId}:`, error.message);
       }
-    });
+    }, 2000); // Attendre 2 secondes après la création du produit
   }
 
   // ✅ Fonction utilitaire pour traiter les images et formater la description
@@ -972,9 +983,7 @@ export class ProductsService {
       this.logger.log(`✅ Produit créé: ${product.id} - ${product.name}`);
 
       // ✅ Synchroniser les reviews en arrière-plan (ne bloque pas l'import)
-      this.syncProductReviewsInBackground(product.id, pid).catch(err => {
-        this.logger.error(`⚠️ Erreur sync reviews (non bloquant): ${err.message}`);
-      });
+      this.syncProductReviewsInBackground(product.id, pid);
 
       // ✅ Créer les ProductVariant pour TOUS les variants
       try {
@@ -1595,9 +1604,7 @@ export class ProductsService {
       });
 
       // ✅ Synchroniser les reviews en arrière-plan (ne bloque pas l'import)
-      this.syncProductReviewsInBackground(product.id, cjProduct.cjProductId).catch(err => {
-        this.logger.error(`⚠️ Erreur sync reviews (non bloquant): ${err.message}`);
-      });
+      this.syncProductReviewsInBackground(product.id, cjProduct.cjProductId);
 
       // 6. 🆕 CRÉER LES PRODUCTVARIANTS AVEC LEURS STOCKS
       console.log('📦 [PREPARE] Création des ProductVariants avec stocks...');
