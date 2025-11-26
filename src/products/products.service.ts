@@ -36,6 +36,39 @@ export class ProductsService {
     };
   }
 
+  // ✅ Synchroniser les reviews CJ en arrière-plan après l'import
+  private async syncProductReviewsInBackground(productId: string, cjProductId: string): Promise<void> {
+    // Lancer en arrière-plan sans bloquer
+    setImmediate(async () => {
+      try {
+        this.logger.log(`🔄 Synchronisation des reviews pour produit ${productId} (CJ: ${cjProductId})...`);
+        
+        // Récupérer les reviews depuis l'API CJ
+        const reviews = await this.cjApiClient.getAllProductReviews(cjProductId);
+        
+        if (reviews && reviews.length > 0) {
+          const { rating, count } = this.calculateRatingFromReviews(reviews);
+          
+          // Mettre à jour le produit avec les reviews
+          await this.prisma.product.update({
+            where: { id: productId },
+            data: {
+              cjReviews: JSON.stringify(reviews),
+              rating: rating,
+              reviewsCount: count
+            }
+          });
+          
+          this.logger.log(`✅ ${count} reviews synchronisés pour produit ${productId} - Rating: ${rating}/5`);
+        } else {
+          this.logger.log(`ℹ️ Aucun avis disponible pour produit ${productId}`);
+        }
+      } catch (error) {
+        this.logger.error(`❌ Erreur synchronisation reviews pour produit ${productId}:`, error.message);
+      }
+    });
+  }
+
   // ✅ Fonction utilitaire pour traiter les images et formater la description
   private processProductImages(product: any) {
     let imageUrls: string[] = [];
@@ -938,6 +971,11 @@ export class ProductsService {
 
       this.logger.log(`✅ Produit créé: ${product.id} - ${product.name}`);
 
+      // ✅ Synchroniser les reviews en arrière-plan (ne bloque pas l'import)
+      this.syncProductReviewsInBackground(product.id, pid).catch(err => {
+        this.logger.error(`⚠️ Erreur sync reviews (non bloquant): ${err.message}`);
+      });
+
       // ✅ Créer les ProductVariant pour TOUS les variants
       try {
         const client = await this.initializeCJClient();
@@ -1554,6 +1592,11 @@ export class ProductsService {
         name: product.name,
         status: product.status,
         categoryId: product.categoryId
+      });
+
+      // ✅ Synchroniser les reviews en arrière-plan (ne bloque pas l'import)
+      this.syncProductReviewsInBackground(product.id, cjProduct.cjProductId).catch(err => {
+        this.logger.error(`⚠️ Erreur sync reviews (non bloquant): ${err.message}`);
       });
 
       // 6. 🆕 CRÉER LES PRODUCTVARIANTS AVEC LEURS STOCKS
