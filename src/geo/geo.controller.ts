@@ -19,9 +19,20 @@ export class GeoController {
   async detectCountry(@Req() req: any, @Query('ip') ip?: string): Promise<GeoLocationResult | { error: string }> {
     try {
       // Utiliser l'IP fournie ou extraire depuis la requête
-      const clientIP = ip || req.ip || req.connection?.remoteAddress || req.headers['x-forwarded-for']?.split(',')[0];
+      // Railway utilise x-forwarded-for pour la vraie IP du client
+      const forwardedFor = req.headers['x-forwarded-for'];
+      const clientIP = ip || 
+                       (forwardedFor ? forwardedFor.split(',')[0].trim() : null) ||
+                       req.headers['x-real-ip'] ||
+                       req.ip || 
+                       req.connection?.remoteAddress ||
+                       'check';
       
-      this.logger.log(`🌍 Détection pays pour IP: ${clientIP}`);
+      this.logger.log(`🌍 [GEO] Détection pays pour IP: ${clientIP} (headers: ${JSON.stringify({
+        'x-forwarded-for': req.headers['x-forwarded-for'],
+        'x-real-ip': req.headers['x-real-ip'],
+        'req.ip': req.ip
+      })})`);
       
       const result = await this.geoService.detectCountryFromIP(clientIP);
       
