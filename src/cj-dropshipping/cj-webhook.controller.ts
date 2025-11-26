@@ -7,7 +7,7 @@ export interface CJWebhookPayload {
   params: any;
 }
 
-@Controller('cj-dropshipping/webhooks')
+@Controller('api/cj-dropshipping/webhooks')
 export class CJWebhookController {
   private readonly logger = new Logger(CJWebhookController.name);
 

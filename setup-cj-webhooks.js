@@ -7,23 +7,23 @@ const WEBHOOK_BASE_URL = 'https://votre-domaine.com'; // Remplacez par votre dom
 // Configuration des webhooks
 const webhookConfig = {
   productWebhook: {
-    url: `${WEBHOOK_BASE_URL}/cj-dropshipping/webhooks/product`,
+    url: `${WEBHOOK_BASE_URL}/api/cj-dropshipping/webhooks/product`,
     topics: ['PRODUCT']
   },
   variantWebhook: {
-    url: `${WEBHOOK_BASE_URL}/cj-dropshipping/webhooks/variant`,
+    url: `${WEBHOOK_BASE_URL}/api/cj-dropshipping/webhooks/variant`,
     topics: ['VARIANT']
   },
   stockWebhook: {
-    url: `${WEBHOOK_BASE_URL}/cj-dropshipping/webhooks/stock`,
+    url: `${WEBHOOK_BASE_URL}/api/cj-dropshipping/webhooks/stock`,
     topics: ['STOCK']
   },
   orderWebhook: {
-    url: `${WEBHOOK_BASE_URL}/cj-dropshipping/webhooks/order`,
+    url: `${WEBHOOK_BASE_URL}/api/cj-dropshipping/webhooks/order`,
     topics: ['ORDER']
   },
   logisticWebhook: {
-    url: `${WEBHOOK_BASE_URL}/cj-dropshipping/webhooks/logistic`,
+    url: `${WEBHOOK_BASE_URL}/api/cj-dropshipping/webhooks/logistic`,
     topics: ['LOGISTIC']
   }
 };
