@@ -23,72 +23,75 @@ export class GeoLocationService {
    */
   async detectCountryFromIP(ip?: string): Promise<GeoLocationResult | null> {
     try {
+      // Essayer d'abord avec ipapi.com (si clé disponible)
       const accessKey = this.configService.get<string>('IPAPI_ACCESS_KEY');
-      if (!accessKey) {
-        this.logger.warn('⚠️ IPAPI_ACCESS_KEY non configurée, utilisation du fallback');
-        return {
-          countryCode: 'FR',
-          countryName: 'France',
-          source: 'ipapi',
-        };
-      }
-
-      // Utiliser 'check' si aucune IP n'est fournie pour détecter l'IP de la requête
-      const targetIp = ip || 'check';
-      this.logger.log(`🌍 Détection pays depuis IP: ${targetIp === 'check' ? 'requête actuelle' : targetIp}`);
       
-      const url = `${this.ipapiUrl}/${targetIp}`;
-      const response = await axios.get(url, {
-        params: {
-          access_key: accessKey,
-          // Ne pas limiter les champs pour obtenir l'objet currency complet
-          language: 'fr', // Noms de pays en français
-          output: 'json', // Format JSON explicite
-        },
+      if (accessKey) {
+        this.logger.log(`🔑 Utilisation ipapi.com avec clé API`);
+        try {
+          const targetIp = ip || 'check';
+          const url = `${this.ipapiUrl}/${targetIp}`;
+          const response = await axios.get(url, {
+            params: {
+              access_key: accessKey,
+              language: 'fr',
+              output: 'json',
+            },
+            timeout: 5000,
+            headers: {
+              'User-Agent': 'KAMRI-Platform/1.0',
+            },
+          });
+          
+          if (response.data && response.data.country_code) {
+            const currencyCode = response.data.currency?.code || response.data.currency;
+            const result: GeoLocationResult = {
+              countryCode: response.data.country_code,
+              countryName: response.data.country_name || response.data.country_code,
+              currency: currencyCode,
+              ip: response.data.ip || ip,
+              source: 'ipapi',
+            };
+            this.logger.log(`✅ Pays détecté: ${result.countryCode} (${result.countryName}) - Devise: ${result.currency || 'N/A'} via ipapi.com`);
+            return result;
+          }
+        } catch (apiError: any) {
+          this.logger.warn(`⚠️ ipapi.com échoué (${apiError.message}), utilisation de ipapi.co gratuit`);
+        }
+      }
+      
+      // Fallback : utiliser ipapi.co (gratuit, pas de clé)
+      this.logger.log(`🌍 Utilisation ipapi.co (gratuit) pour IP: ${ip || 'auto'}`);
+      const targetUrl = ip ? `https://ipapi.co/${ip}/json/` : 'https://ipapi.co/json/';
+      const response = await axios.get(targetUrl, {
         timeout: 5000,
         headers: {
           'User-Agent': 'KAMRI-Platform/1.0',
         },
       });
 
-      // Vérifier si c'est une erreur de l'API
-      if (response.data && response.data.success === false) {
-        const errorInfo = response.data.error?.info || 'Erreur inconnue';
-        const errorCode = response.data.error?.code;
-        this.logger.error(`❌ Erreur API ipapi.com (code ${errorCode}): ${errorInfo}`);
-        
-        // Si limite mensuelle atteinte, retourner un fallback
-        if (errorCode === 104) {
-          this.logger.warn('⚠️ Limite mensuelle ipapi.com atteinte, utilisation du fallback');
-        }
-        
-        return {
-          countryCode: 'FR',
-          countryName: 'France',
-          source: 'ipapi',
-        };
-      }
-
-      if (response.data && response.data.country_code) {
-        // Extraire la devise depuis l'objet currency si disponible
-        const currencyCode = response.data.currency?.code || response.data.currency;
+      // Traiter la réponse de ipapi.co (format différent)
+      if (response.data && (response.data.country || response.data.country_code)) {
+        const countryCode = response.data.country_code || response.data.country;
+        const currencyCode = response.data.currency;
         
         const result: GeoLocationResult = {
-          countryCode: response.data.country_code,
-          countryName: response.data.country_name || response.data.country_code,
-          currency: currencyCode, // Devise depuis l'API (ex: USD, EUR, XAF)
+          countryCode: countryCode,
+          countryName: response.data.country_name || countryCode,
+          currency: currencyCode,
           ip: response.data.ip || ip,
           source: 'ipapi',
         };
 
-        this.logger.log(`✅ Pays détecté: ${result.countryCode} (${result.countryName}) - Devise: ${result.currency || 'N/A'} via ipapi.com`);
+        this.logger.log(`✅ Pays détecté: ${result.countryCode} (${result.countryName}) - Devise: ${result.currency || 'N/A'} via ipapi.co`);
         return result;
       }
 
-      this.logger.warn('⚠️ Réponse ipapi.com invalide');
+      this.logger.warn('⚠️ Réponse API invalide');
       return {
         countryCode: 'FR',
         countryName: 'France',
+        currency: 'EUR',
         source: 'ipapi',
       };
     } catch (error: any) {
