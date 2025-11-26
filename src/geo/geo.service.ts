@@ -41,8 +41,7 @@ export class GeoLocationService {
       const response = await axios.get(url, {
         params: {
           access_key: accessKey,
-          // Paramètres optionnels pour optimiser la réponse
-          fields: 'ip,country_code,country_name,currency', // Inclure currency pour obtenir la devise directement
+          // Ne pas limiter les champs pour obtenir l'objet currency complet
           language: 'fr', // Noms de pays en français
           output: 'json', // Format JSON explicite
         },
