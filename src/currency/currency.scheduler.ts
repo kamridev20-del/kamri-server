@@ -10,17 +10,18 @@ export class CurrencyScheduler implements OnModuleInit {
 
   onModuleInit() {
     // ✅ Mise à jour initiale au démarrage (non bloquante)
-    // On attend quelques secondes pour laisser l'application démarrer complètement
+    // On attend 30 secondes pour laisser l'application démarrer complètement
+    // et éviter de ralentir le démarrage avec des appels API externes
     setTimeout(() => {
       this.updateExchangeRates();
-    }, 5000); // Délai de 5 secondes après le démarrage
+    }, 30000); // Délai de 30 secondes après le démarrage
     
     // Mise à jour toutes les 24 heures (86400000 ms)
     this.updateInterval = setInterval(() => {
       this.updateExchangeRates();
     }, 24 * 60 * 60 * 1000);
     
-    this.logger.log('✅ CurrencyScheduler initialisé - Mise à jour automatique toutes les 24h');
+    this.logger.log('✅ CurrencyScheduler initialisé - Première mise à jour dans 30s, puis toutes les 24h');
   }
 
   onModuleDestroy() {
@@ -37,18 +38,18 @@ export class CurrencyScheduler implements OnModuleInit {
     try {
       const result = await this.currencyService.updateExchangeRates();
       if (result.success) {
-        this.logger.log(`✅ ${result.updated} taux de change mis à jour avec succès`);
-      } else {
-        // Ne pas logger comme erreur si c'est juste la clé API manquante (c'est un avertissement)
-        if (result.error?.includes('CURRENCY_API_KEY') || result.error?.includes('non configurée')) {
-          this.logger.warn(`⚠️ Mise à jour des taux de change ignorée: ${result.error}`);
-          this.logger.warn(`💡 Pour activer la mise à jour automatique, configurez CURRENCY_API_KEY dans vos variables d'environnement`);
+        if (result.usingDefaults) {
+          this.logger.log(`💡 ${result.updated} taux de change par défaut appliqués (API externe inaccessible)`);
         } else {
-          this.logger.error(`❌ Erreur lors de la mise à jour: ${result.error}`);
+          this.logger.log(`✅ ${result.updated} taux de change mis à jour depuis l'API`);
         }
+      } else {
+        // Ne pas logger comme erreur - juste un avertissement
+        this.logger.warn(`⚠️ Impossible de mettre à jour les taux: ${result.error}`);
       }
     } catch (error) {
-      this.logger.error(`❌ Erreur lors de la mise à jour des taux de change: ${error instanceof Error ? error.message : String(error)}`);
+      // Erreur silencieuse - ne pas polluer les logs
+      this.logger.warn(`⚠️ Mise à jour des taux ignorée: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 }

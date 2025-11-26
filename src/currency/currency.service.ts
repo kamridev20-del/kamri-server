@@ -65,6 +65,21 @@ export const SUPPORTED_CURRENCIES = ['USD', 'EUR', 'XAF', 'XOF', 'CNY', 'GBP', '
 
 export type SupportedCurrency = typeof SUPPORTED_CURRENCIES[number];
 
+// ✅ Taux de change par défaut (fallback si l'API est inaccessible)
+// Mis à jour manuellement - Base USD = 1.0
+export const DEFAULT_EXCHANGE_RATES: Record<string, number> = {
+  USD: 1.0,
+  EUR: 0.92,      // 1 USD = 0.92 EUR
+  GBP: 0.79,      // 1 USD = 0.79 GBP
+  CAD: 1.36,      // 1 USD = 1.36 CAD
+  AUD: 1.52,      // 1 USD = 1.52 AUD
+  CHF: 0.88,      // 1 USD = 0.88 CHF
+  CNY: 7.24,      // 1 USD = 7.24 CNY
+  JPY: 149.50,    // 1 USD = 149.50 JPY
+  XAF: 605.0,     // 1 USD = 605 FCFA (Afrique Centrale)
+  XOF: 605.0,     // 1 USD = 605 FCFA (Afrique de l'Ouest)
+};
+
 @Injectable()
 export class CurrencyService {
   private readonly logger = new Logger(CurrencyService.name);
@@ -84,18 +99,22 @@ export class CurrencyService {
 
   /**
    * Récupérer les taux de change depuis l'API externe (Currency Data API)
-   * ✅ Avec mécanisme de retry
+   * ✅ Avec mécanisme de retry limité
    */
-  async fetchExchangeRates(retries = 3): Promise<Record<string, number> | null> {
+  async fetchExchangeRates(retries = 2): Promise<Record<string, number> | null> {
     const apiKey = this.configService.get<string>('CURRENCY_API_KEY');
     if (!apiKey) {
-      this.logger.warn('⚠️ CURRENCY_API_KEY non configurée - les taux de change ne seront pas mis à jour automatiquement');
+      // Pas de log ici, déjà géré dans updateExchangeRates
       return null;
     }
 
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
-        this.logger.log(`🔄 Récupération des taux de change (tentative ${attempt}/${retries})...`);
+        if (attempt === 1) {
+          this.logger.log(`🔄 Récupération des taux de change depuis l'API...`);
+        } else {
+          this.logger.log(`🔄 Tentative ${attempt}/${retries}...`);
+        }
         
         // Construire la liste des devises supportées
         const symbols = SUPPORTED_CURRENCIES.join(',');
@@ -108,11 +127,11 @@ export class CurrencyService {
           headers: {
             'apikey': apiKey,
           },
-          timeout: 30000, // ✅ 30 secondes
+          timeout: 15000, // ✅ Réduit à 15 secondes
         });
 
         if (response.data && response.data.success && response.data.quotes) {
-          this.logger.log('✅ Taux de change récupérés avec succès');
+          this.logger.log('✅ Taux de change récupérés avec succès depuis l\'API');
           
           // Convertir le format quotes (USDUSD=1.0, USDEUR=0.92) en format simple (EUR=0.92)
           const rates: Record<string, number> = {};
@@ -125,30 +144,22 @@ export class CurrencyService {
           return rates;
         }
 
-        this.logger.warn('⚠️ Format de réponse API invalide:', response.data);
-        
         // Si c'est la dernière tentative, retourner null
         if (attempt === retries) {
           return null;
         }
         
-        // Attendre avant de réessayer (backoff exponentiel)
-        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+        // Attendre 2 secondes avant de réessayer
+        await new Promise(resolve => setTimeout(resolve, 2000));
         
       } catch (error: any) {
-        const errorMessage = error.response?.data || error.message;
-        
+        // Si c'est la dernière tentative, juste retourner null sans log verbeux
         if (attempt === retries) {
-          this.logger.error(`❌ Échec après ${retries} tentatives: ${errorMessage}`);
           return null;
         }
         
-        this.logger.warn(`⚠️ Tentative ${attempt}/${retries} échouée: ${errorMessage}`);
-        
-        // Attendre avant de réessayer (backoff exponentiel: 2s, 4s, 8s)
-        const delayMs = Math.pow(2, attempt) * 1000;
-        this.logger.log(`⏳ Nouvelle tentative dans ${delayMs / 1000}s...`);
-        await new Promise(resolve => setTimeout(resolve, delayMs));
+        // Attendre 2 secondes avant de réessayer
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
     }
 
@@ -158,26 +169,20 @@ export class CurrencyService {
   /**
    * Mettre à jour les taux de change dans la base de données
    */
-  async updateExchangeRates(): Promise<{ success: boolean; updated: number; error?: string }> {
+  async updateExchangeRates(): Promise<{ success: boolean; updated: number; error?: string; usingDefaults?: boolean }> {
     try {
       // Vérifier d'abord si la clé API est configurée
       const apiKey = this.configService.get<string>('CURRENCY_API_KEY');
       if (!apiKey) {
-        return {
-          success: false,
-          updated: 0,
-          error: 'CURRENCY_API_KEY non configurée dans les variables d\'environnement',
-        };
+        this.logger.warn('⚠️ CURRENCY_API_KEY non configurée - utilisation des taux par défaut');
+        return await this.useDefaultRates();
       }
 
       const rates = await this.fetchExchangeRates();
       
       if (!rates) {
-        return {
-          success: false,
-          updated: 0,
-          error: 'Impossible de récupérer les taux de change depuis l\'API',
-        };
+        this.logger.warn('⚠️ API inaccessible - utilisation des taux par défaut');
+        return await this.useDefaultRates();
       }
 
       let updatedCount = 0;
@@ -213,18 +218,54 @@ export class CurrencyService {
         },
       });
 
-      this.logger.log(`✅ ${updatedCount + 1} taux de change mis à jour`);
+      this.logger.log(`✅ ${updatedCount + 1} taux de change mis à jour depuis l'API`);
 
       return {
         success: true,
         updated: updatedCount + 1,
       };
     } catch (error) {
-      this.logger.error('❌ Erreur lors de la mise à jour des taux:', error);
+      this.logger.warn(`⚠️ Erreur lors de la mise à jour - utilisation des taux par défaut`);
+      return await this.useDefaultRates();
+    }
+  }
+
+  /**
+   * Utiliser les taux de change par défaut (fallback)
+   */
+  private async useDefaultRates(): Promise<{ success: boolean; updated: number; error?: string; usingDefaults: boolean }> {
+    try {
+      let updatedCount = 0;
+
+      for (const [currency, rate] of Object.entries(DEFAULT_EXCHANGE_RATES)) {
+        await this.prisma.exchangeRate.upsert({
+          where: { currency },
+          update: {
+            rate: rate,
+            updatedat: new Date(),
+          },
+          create: {
+            currency,
+            rate: rate,
+          },
+        });
+        updatedCount++;
+      }
+
+      this.logger.log(`💡 ${updatedCount} taux de change par défaut appliqués`);
+
+      return {
+        success: true,
+        updated: updatedCount,
+        usingDefaults: true,
+      };
+    } catch (error) {
+      this.logger.error('❌ Erreur lors de l\'application des taux par défaut:', error);
       return {
         success: false,
         updated: 0,
         error: error instanceof Error ? error.message : 'Erreur inconnue',
+        usingDefaults: true,
       };
     }
   }
