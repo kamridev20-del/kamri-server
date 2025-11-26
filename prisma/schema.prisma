@@ -97,6 +97,10 @@ model Product {
   dimensions       String? // Dimensions du produit
   brand            String? // Marque
   tags             String? @db.Text // JSON des tags
+  
+  // ✅ Notes et avis (calculés depuis CJ reviews)
+  rating           Float? // Note moyenne (0-5)
+  reviewsCount     Int?   @default(0) // Nombre total d'avis
 
   // ✅ Tracking de l'import pour éviter doublons
   importStatus String?   @default("new") // new, updated, imported, duplicate

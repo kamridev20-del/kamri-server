@@ -17,6 +17,25 @@ export class ProductsService {
     private cjApiClient: CJAPIClient
   ) {}
 
+  // ✅ Fonction utilitaire pour calculer le rating moyen depuis les reviews CJ
+  private calculateRatingFromReviews(reviews: any[]): { rating: number; count: number } {
+    if (!reviews || reviews.length === 0) {
+      return { rating: 0, count: 0 };
+    }
+
+    const totalScore = reviews.reduce((sum, review) => {
+      const score = parseFloat(review.score || review.rating || '0');
+      return sum + score;
+    }, 0);
+
+    const averageRating = totalScore / reviews.length;
+    
+    return {
+      rating: Math.round(averageRating * 10) / 10, // Arrondir à 1 décimale
+      count: reviews.length
+    };
+  }
+
   // ✅ Fonction utilitaire pour traiter les images et formater la description
   private processProductImages(product: any) {
     let imageUrls: string[] = [];
@@ -54,11 +73,28 @@ export class ProductsService {
       formattedDescription = this.formatProductDescription(formattedDescription);
     }
 
+    // ✅ Calculer le rating et reviews depuis cjReviews si pas déjà présent
+    let rating = product.rating;
+    let reviews = product.reviewsCount;
+    
+    if ((!rating || !reviews) && product.cjReviews) {
+      try {
+        const cjReviewsData = JSON.parse(product.cjReviews);
+        const calculated = this.calculateRatingFromReviews(cjReviewsData);
+        rating = calculated.rating;
+        reviews = calculated.count;
+      } catch (e) {
+        // Ignore parsing errors
+      }
+    }
+
     return {
       ...product,
       image: mainImage,
       images: imageUrls,
-      description: formattedDescription
+      description: formattedDescription,
+      rating: rating || 0,
+      reviews: reviews || 0,
     };
   }
 
@@ -877,6 +913,13 @@ export class ProductsService {
           dimensions: cjProduct.dimensions || null,
           brand: cjProduct.brand || null,
           tags: JSON.stringify(cjProduct.tags || []),
+          
+          // ✅ Calculer et stocker le rating et le nombre d'avis
+          ...(() => {
+            const reviewsData = cjProduct.reviews || cjProduct.cjReviews || [];
+            const { rating, count } = this.calculateRatingFromReviews(reviewsData);
+            return { rating, reviewsCount: count };
+          })(),
           
           // ✅ Créer le mapping CJ
           cjMapping: {
