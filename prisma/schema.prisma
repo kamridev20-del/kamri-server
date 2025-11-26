@@ -1,6 +1,3 @@
-// This is your Prisma schema file for PostgreSQL production
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,152 +8,133 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  firstName String? // Prénom
-  lastName  String? // Nom de famille
-  phone     String? // Téléphone
-  address   String? // Adresse principale
-  password  String // Mot de passe hashé
-  role      String   @default("user") // user, admin
-  status    String   @default("active") // active, suspended, inactive
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
+  id           String        @id @default(cuid())
+  email        String        @unique
+  name         String?
+  firstName    String?
+  lastName     String?
+  phone        String?
+  address      String?
+  password     String
+  role         String        @default("user")
+  status       String        @default("active")
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  addresses    Address[]
   cart         CartItem[]
   orders       Order[]
-  addresses    Address[]
   reviews      Review[]
+  userSettings UserSettings?
   wishlist     Wishlist[]
-  userSettings UserSettings? // ✅ Added user settings relation
 
-  @@map("users")
   @@index([email])
+  @@map("users")
 }
 
 model Category {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  nameEn      String? // Nom en anglais
+  id          String    @id @default(cuid())
+  name        String    @unique
+  nameEn      String?
   description String?
-  icon        String?  @default("🛍️")
-  color       String?  @default("#4CAF50")
-  imageUrl    String?  // ✅ URL de l'image personnalisée pour la catégorie
-  externalId  String? // ID externe (CJ, etc.)
-  parentId    String? // ID parent pour hiérarchie
-  level       Int? // Niveau dans la hiérarchie
-  isActive    Boolean  @default(true)
-  isDefault   Boolean  @default(false) // ✅ Catégories par défaut non supprimables
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  icon        String?   @default("🛍️")
+  color       String?   @default("#4CAF50")
+  externalId  String?
+  parentId    String?
+  level       Int?
+  isActive    Boolean   @default(true)
+  isDefault   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  imageUrl    String?
+  products    Product[]
 
-  // Relations
-  products Product[]
-
-  @@map("categories")
   @@index([name])
   @@index([parentId])
+  @@map("categories")
 }
 
 model Product {
-  id               String   @id @default(cuid())
-  name             String
-  description      String?   @db.Text
-  price            Float
-  originalPrice    Float?
-  image            String?
-  categoryId       String?
-  supplierId       String?
-  externalCategory String? // Catégorie externe du fournisseur
-  source           String? // Source du produit: dummy-json, cj-dropshipping, manual
-  status           String   @default("pending") // pending, active, inactive, rejected
-  badge            String? // promo, tendances, nouveau, top-ventes
-  stock            Int      @default(0)
-  sales            Int      @default(0)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id                String            @id @default(cuid())
+  name              String
+  description       String?
+  price             Float
+  originalPrice     Float?
+  image             String?
+  categoryId        String?
+  supplierId        String?
+  externalCategory  String?
+  source            String?
+  status            String            @default("pending")
+  badge             String?
+  stock             Int               @default(0)
+  sales             Int               @default(0)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  cjProductId       String?           @unique
+  productSku        String?
+  productWeight     String?
+  packingWeight     String?
+  productType       String?
+  productUnit       String?
+  productKeyEn      String?
+  materialNameEn    String?
+  packingNameEn     String?
+  suggestSellPrice  String?
+  listedNum         Int?
+  supplierName      String?
+  createrTime       String?
+  variants          String?
+  cjReviews         String?
+  dimensions        String?
+  brand             String?
+  tags              String?
+  importStatus      String?           @default("new")
+  lastImportAt      DateTime?
+  margin            Float?
+  isEdited          Boolean           @default(false)
+  editedAt          DateTime?
+  editedBy          String?
+  originCountryCode String?           @default("CN")
+  originWarehouseId String?
+  rating            Float?
+  reviewsCount      Int?              @default(0)
+  cartItems         CartItem[]
+  cjMapping         CJProductMapping?
+  images            Image[]
+  orderItems        OrderItem[]
+  productVariants   ProductVariant[]
+  category          Category?         @relation(fields: [categoryId], references: [id])
+  supplier          Supplier?         @relation(fields: [supplierId], references: [id])
+  reviews           Review[]
+  wishlist          Wishlist[]
 
-  // ✅ CJ Dropshipping - Données détaillées avec contraintes anti-doublons
-  cjProductId      String? @unique // ✅ ID produit CJ unique pour éviter doublons
-  productSku       String? // SKU du produit CJ (peut être dupliqué entre fournisseurs)
-  productWeight    String? // Poids du produit (peut être une plage)
-  packingWeight    String? // Poids d'emballage
-  productType      String? // Type de produit CJ
-  productUnit      String? // Unité du produit
-  productKeyEn     String? @db.Text // Attributs/clés du produit
-  materialNameEn   String? // Matériau (ex: "Cloth")
-  packingNameEn    String? // Type d'emballage (ex: "Plastic bags")
-  suggestSellPrice String? // Prix de vente suggéré CJ (peut être une plage)
-  listedNum        Int? // Nombre de listings
-  supplierName     String? // Nom du fournisseur
-  createrTime      String? // Date de création CJ
-  variants         String? @db.Text // JSON des variants CJ
-  cjReviews        String? @db.Text // JSON des avis CJ (pour éviter conflit avec reviews relation)
-  dimensions       String? // Dimensions du produit
-  brand            String? // Marque
-  tags             String? @db.Text // JSON des tags
-  
-  // ✅ Notes et avis (calculés depuis CJ reviews)
-  rating           Float? // Note moyenne (0-5)
-  reviewsCount     Int?   @default(0) // Nombre total d'avis
-
-  // ✅ Tracking de l'import pour éviter doublons
-  importStatus String?   @default("new") // new, updated, imported, duplicate
-  lastImportAt DateTime? // Dernière date d'import
-
-  // ✅ Édition manuelle avant publication
-  margin   Float? // Marge appliquée (%)
-  isEdited Boolean   @default(false) // Produit édité manuellement
-  editedAt DateTime? // Date de dernière édition
-  editedBy String? // ID de l'admin qui a édité
-
-  // ✅ Pays d'origine pour la livraison multi-origines
-  originCountryCode String? @default("CN") // Code pays d'origine (CN, US, etc.)
-  originWarehouseId String? // ID entrepôt si applicable
-
-  // Relations
-  category        Category?         @relation(fields: [categoryId], references: [id])
-  supplier        Supplier?         @relation(fields: [supplierId], references: [id])
-  images          Image[]
-  cartItems       CartItem[]
-  orderItems      OrderItem[]
-  reviews         Review[]
-  wishlist        Wishlist[]
-  cjMapping       CJProductMapping?
-  productVariants ProductVariant[] // ✅ Relation vers les variants (évite conflit avec variants JSON)
-
-  @@map("products")
   @@index([categoryId])
   @@index([supplierId])
   @@index([status])
   @@index([cjProductId])
   @@index([name])
+  @@map("products")
 }
 
-// ✅ Modèle séparé pour les variants de produits
 model ProductVariant {
-  id          String    @id @default(cuid())
+  id          String      @id @default(cuid())
   productId   String
-  cjVariantId String?   @unique // ID CJ de la variante
+  cjVariantId String?     @unique
   name        String?
   sku         String?
   price       Float?
   weight      Float?
-  dimensions  String? @db.Text // JSON des dimensions {length, width, height}
-  image       String? // URL de l'image de la variante
-  status      String? // Statut de la variante
-  properties  String? @db.Text // JSON des propriétés {key, value1, value2, value3}
-  stock       Int? // Stock disponible
-  isActive    Boolean   @default(true)
-  lastSyncAt  DateTime? // Dernière synchronisation avec CJ
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  // Relations
-  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
-  orderItems OrderItem[] // ✅ Commandes qui utilisent ce variant
+  dimensions  String?
+  image       String?
+  status      String?
+  properties  String?
+  stock       Int?
+  isActive    Boolean     @default(true)
+  lastSyncAt  DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  orderItems  OrderItem[]
+  product     Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([cjVariantId])
   @@index([productId])
@@ -169,12 +147,10 @@ model Image {
   alt       String?
   productId String
   createdAt DateTime @default(now())
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  // Relations
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  @@map("images")
   @@index([productId])
+  @@map("images")
 }
 
 model CartItem {
@@ -184,43 +160,35 @@ model CartItem {
   quantity  Int      @default(1)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  // Relations
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, productId])
-  @@map("cart_items")
   @@index([userId])
   @@index([productId])
+  @@map("cart_items")
 }
 
 model Order {
-  id        String   @id @default(cuid())
-  userId    String
-  total     Float
-  status    String   @default("PENDING")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // ✅ Informations de paiement Stripe
-  paymentIntentId String? // ID du PaymentIntent Stripe
-  paymentStatus   String? // Statut du paiement: pending, succeeded, failed, refunded, partially_refunded
-  paymentMethod   String? // Méthode de paiement: card, paypal, bank
-  refundId        String? // ID du remboursement Stripe
-  refundAmount    Float? // Montant remboursé
-  refundedAt      DateTime? // Date du remboursement
-  refundReason    String? // Raison du remboursement
-
-  // ✅ Informations de livraison
-  shippingAddress String? @db.Text // JSON string avec l'adresse de livraison
-  shippingMethod  String? // Méthode de livraison
-  shippingCost    Float? // Coût de livraison
-
-  // Relations
-  user      User            @relation(fields: [userId], references: [id])
-  items     OrderItem[]
-  cjMapping CJOrderMapping?
+  id              String          @id @default(cuid())
+  userId          String
+  total           Float
+  status          String          @default("PENDING")
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  paymentIntentId String?
+  paymentStatus   String?
+  paymentMethod   String?
+  refundId        String?
+  refundAmount    Float?
+  refundedAt      DateTime?
+  refundReason    String?
+  shippingAddress String?
+  shippingMethod  String?
+  shippingCost    Float?
+  cjMapping       CJOrderMapping?
+  items           OrderItem[]
+  user            User            @relation(fields: [userId], references: [id])
 
   @@index([paymentIntentId])
   @@index([paymentStatus])
@@ -231,22 +199,20 @@ model Order {
 }
 
 model OrderItem {
-  id        String   @id @default(cuid())
+  id        String          @id @default(cuid())
   orderId   String
   productId String
   quantity  Int
   price     Float
-  variantId String? // ✅ ID du variant sélectionné (ProductVariant.id)
-  createdAt DateTime @default(now())
+  variantId String?
+  createdAt DateTime        @default(now())
+  order     Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product         @relation(fields: [productId], references: [id])
+  variant   ProductVariant? @relation(fields: [variantId], references: [id])
 
-  // Relations
-  order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product Product         @relation(fields: [productId], references: [id])
-  variant ProductVariant? @relation(fields: [variantId], references: [id]) // ✅ Relation vers le variant sélectionné
-
-  @@map("order_items")
   @@index([orderId])
   @@index([productId])
+  @@map("order_items")
 }
 
 model Address {
@@ -260,12 +226,10 @@ model Address {
   isDefault Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("addresses")
   @@index([userId])
+  @@map("addresses")
 }
 
 model Review {
@@ -273,39 +237,34 @@ model Review {
   userId    String
   productId String
   rating    Int
-  comment   String?  @db.Text
+  comment   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  // Relations
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, productId])
-  @@map("reviews")
   @@index([productId])
   @@index([rating])
+  @@map("reviews")
 }
 
-// Nouveaux modèles pour le dropshipping
 model Supplier {
-  id          String    @id @default(cuid())
-  name        String    @unique
-  description String?   @db.Text
-  apiUrl      String
-  apiKey      String
-  status      String    @default("disconnected") // connected, disconnected, pending
-  lastSync    DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  // Relations
-  products           Product[]
+  id                 String                     @id @default(cuid())
+  name               String                     @unique
+  description        String?
+  apiUrl             String
+  apiKey             String
+  status             String                     @default("disconnected")
+  lastSync           DateTime?
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
   categoryMappings   CategoryMapping[]
+  products           Product[]
   unmappedCategories UnmappedExternalCategory[]
 
-  @@map("suppliers")
   @@index([name])
+  @@map("suppliers")
 }
 
 model CategoryMapping {
@@ -313,16 +272,14 @@ model CategoryMapping {
   supplierId       String
   externalCategory String
   internalCategory String
-  status           String   @default("mapped") // mapped, pending, failed
+  status           String   @default("mapped")
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
-
-  // Relations
-  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  supplier         Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
 
   @@unique([supplierId, externalCategory])
-  @@map("category_mappings")
   @@index([supplierId])
+  @@map("category_mappings")
 }
 
 model UnmappedExternalCategory {
@@ -331,13 +288,11 @@ model UnmappedExternalCategory {
   supplierId       String
   detectedAt       DateTime @default(now())
   productCount     Int      @default(0)
-
-  // Relations
-  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  supplier         Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
 
   @@unique([supplierId, externalCategory])
-  @@map("unmapped_external_categories")
   @@index([supplierId])
+  @@map("unmapped_external_categories")
 }
 
 model Wishlist {
@@ -345,26 +300,24 @@ model Wishlist {
   userId    String
   productId String
   createdAt DateTime @default(now())
-
-  // Relations
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, productId])
-  @@map("wishlist")
   @@index([userId])
+  @@map("wishlist")
 }
 
 model Settings {
   id                 String   @id @default(cuid())
-  theme              String   @default("light") // light, dark
-  currency           String   @default("EUR") // EUR, USD, GBP
-  language           String   @default("fr") // fr, en, es, de
+  theme              String   @default("light")
+  currency           String   @default("EUR")
+  language           String   @default("fr")
   accentColor        String   @default("#4CAF50")
   companyName        String   @default("KAMRI")
   companyEmail       String?
   companyPhone       String?
-  companyAddress     String?  @db.Text
+  companyAddress     String?
   apiRateLimit       Int      @default(1000)
   autoSync           Boolean  @default(true)
   notifications      Boolean  @default(true)
@@ -377,161 +330,126 @@ model Settings {
 }
 
 model UserSettings {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  notifications String   @default("{\"email\": true, \"sms\": false, \"push\": true, \"marketing\": false}")
+  privacy       String   @default("{\"profileVisible\": true, \"orderHistory\": false, \"dataSharing\": false}")
+  preferences   String   @default("{\"theme\": \"light\", \"language\": \"fr\", \"currency\": \"EUR\"}")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // Paramètres de notification (stockés comme String JSON)
-  notifications String @default("{\"email\": true, \"sms\": false, \"push\": true, \"marketing\": false}") @db.Text
-
-  // Paramètres de confidentialité (stockés comme String JSON)
-  privacy String @default("{\"profileVisible\": true, \"orderHistory\": false, \"dataSharing\": false}") @db.Text
-
-  // Préférences utilisateur (stockés comme String JSON)
-  preferences String @default("{\"theme\": \"light\", \"language\": \"fr\", \"currency\": \"EUR\"}") @db.Text
-
-  @@map("user_settings")
   @@index([userId])
+  @@map("user_settings")
 }
 
-// ===== MODÈLES CJ DROPSHIPPING =====
-
-// Configuration CJ Dropshipping
 model CJConfig {
-  id            String    @id @default(cuid())
-  email         String
-  apiKey        String
-  tier          String    @default("free") // free, plus, prime, advanced
-  platformToken String?
-  enabled       Boolean   @default(true)
-  accessToken   String?   @db.Text
-  refreshToken  String?   @db.Text
-  tokenExpiry   DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id             String    @id @default(cuid())
+  email          String
+  apiKey         String
+  tier           String    @default("free")
+  platformToken  String?
+  enabled        Boolean   @default(true)
+  accessToken    String?
+  refreshToken   String?
+  tokenExpiry    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  webhookEnabled Boolean?  @default(false)
+  webhookUrl     String?
+  webhookTypes   String?
 
-  // ✅ Configuration des webhooks
-  webhookEnabled Boolean? @default(false) // Webhooks activés ou non
-  webhookUrl     String? // URL de callback HTTPS
-  webhookTypes   String? // Types configurés (product,stock,order,logistics)
-
-  @@map("cj_configs")
   @@index([email])
+  @@map("cj_configs")
 }
 
-// Magasin CJ Dropshipping
 model CJProductStore {
-  id            String  @id @default(cuid())
-  cjProductId   String  @unique
-  name          String
-  description   String? @db.Text
-  price         Float
-  originalPrice Float?
-  image         String?
-  category      String?
-  status        String  @default("available") // available, selected, imported
-  isFavorite    Boolean @default(false) // Marquer comme favori CJ
+  id                    String   @id @default(cuid())
+  cjProductId           String   @unique
+  name                  String
+  description           String?
+  price                 Float
+  originalPrice         Float?
+  image                 String?
+  category              String?
+  status                String   @default("available")
+  isFavorite            Boolean  @default(false)
+  importStatus          String   @default("not_imported")
+  importedProductId     String?
+  productSku            String?
+  productWeight         String?
+  packingWeight         String?
+  productType           String?
+  productUnit           String?
+  productKeyEn          String?
+  materialNameEn        String?
+  packingNameEn         String?
+  suggestSellPrice      String?
+  listedNum             Int?
+  supplierName          String?
+  supplierId            String?
+  createrTime           String?
+  variants              String?
+  reviews               String?
+  dimensions            String?
+  brand                 String?
+  tags                  String?
+  categoryId            String?
+  entryCode             String?
+  entryName             String?
+  entryNameEn           String?
+  materialName          String?
+  materialKey           String?
+  packingName           String?
+  packingKey            String?
+  productKey            String?
+  productProSet         String?
+  productProEnSet       String?
+  customizationVersion  Int?
+  customizationJson1    String?
+  customizationJson2    String?
+  customizationJson3    String?
+  customizationJson4    String?
+  productVideo          String?
+  deliveryCycle         String?
+  isFreeShipping        Boolean?
+  freeShippingCountries String?
+  defaultShippingMethod String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
-  // ✅ NOUVEAU : Statut d'importation pour la solution hybride
-  importStatus      String  @default("not_imported") // not_imported, imported_draft, imported_published
-  importedProductId String? // ID du produit dans la table Product (si importé)
-
-  // 🔧 AJOUTER TOUS LES CHAMPS DÉTAILLÉS
-  productSku       String?
-  productWeight    String?
-  packingWeight    String?
-  productType      String?
-  productUnit      String?
-  productKeyEn     String? @db.Text
-  materialNameEn   String?
-  packingNameEn    String?
-  suggestSellPrice String?
-  listedNum        Int?
-  supplierName     String?
-  supplierId       String? // ✅ ID fournisseur CJ
-  createrTime      String?
-  variants         String? @db.Text // JSON string
-  reviews          String? @db.Text // JSON string
-  dimensions       String?
-  brand            String?
-  tags             String? @db.Text // JSON string
-
-  // ✅ Champs douaniers (essentiels pour l'export)
-  categoryId  String? // ID catégorie CJ
-  entryCode   String? // HS code (code douanier)
-  entryName   String? @db.Text // Nom douanier (chinois)
-  entryNameEn String? @db.Text // Nom douanier (anglais)
-
-  // ✅ Matériau/Emballage complets
-  materialName String? @db.Text // Nom matériau (chinois)
-  materialKey  String? @db.Text // Attributs matériau
-  packingName  String? @db.Text // Nom emballage (chinois)
-  packingKey   String? @db.Text // Attributs emballage
-
-  // ✅ Attributs produit complets
-  productKey      String? @db.Text // Attributs produit (chinois)
-  productProSet   String? @db.Text // Attributs logistiques (chinois) - JSON array
-  productProEnSet String? @db.Text // Attributs logistiques (anglais) - JSON array
-
-  // ✅ Personnalisation (POD)
-  customizationVersion Int? // Version personnalisation (0=non-POD, 1-5=POD)
-  customizationJson1   String? @db.Text // JSON personnalisation 1
-  customizationJson2   String? @db.Text // JSON personnalisation 2
-  customizationJson3   String? @db.Text // JSON personnalisation 3
-  customizationJson4   String? @db.Text // JSON personnalisation 4
-
-  // ✅ Média
-  productVideo String? @db.Text // JSON array des IDs vidéo (si features=enable_video)
-
-  // ✅ Informations de livraison
-  deliveryCycle         String? // Délai de livraison (ex: "7-15 days")
-  isFreeShipping        Boolean? // Livraison gratuite disponible
-  freeShippingCountries String? @db.Text // JSON array des pays avec livraison gratuite
-  defaultShippingMethod String? // Méthode de livraison par défaut
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("cj_product_store")
   @@index([cjProductId])
   @@index([status])
   @@index([isFavorite])
+  @@map("cj_product_store")
 }
 
-// Mapping produits CJ
 model CJProductMapping {
   id          String    @id @default(cuid())
-  productId   String    @unique // ID produit KAMRI
-  cjProductId String // PID CJ
+  productId   String    @unique
+  cjProductId String
   cjSku       String
   lastSyncAt  DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([cjProductId])
   @@index([productId])
   @@map("cj_product_mappings")
 }
 
-// Mapping commandes CJ
 model CJOrderMapping {
   id            String   @id @default(cuid())
-  orderId       String   @unique // ID commande KAMRI
-  cjOrderId     String // CJ order ID
-  cjOrderNumber String // orderNumber envoyé à CJ
-  status        String // CREATED, PAID, SHIPPED, etc.
+  orderId       String   @unique
+  cjOrderId     String
+  cjOrderNumber String
+  status        String
   trackNumber   String?
-  metadata      String? @db.Text // JSON string avec montants détaillés et autres infos
+  metadata      String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
-
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([cjOrderId])
   @@index([status])
@@ -539,16 +457,15 @@ model CJOrderMapping {
   @@map("cj_order_mappings")
 }
 
-// Logs webhooks CJ améliorés
 model WebhookLog {
   id               String    @id @default(cuid())
   messageId        String    @unique
-  type             String // PRODUCT, VARIANT, STOCK, ORDER, LOGISTIC, etc.
-  payload          String    @db.Text // JSON string du payload original
-  status           String    @default("RECEIVED") // RECEIVED, PROCESSED, ERROR
-  result           String?   @db.Text // JSON string du résultat de traitement
-  error            String?   @db.Text // Message d'erreur si échec
-  processingTimeMs Int? // Temps de traitement en millisecondes
+  type             String
+  payload          String
+  status           String    @default("RECEIVED")
+  result           String?
+  error            String?
+  processingTimeMs Int?
   receivedAt       DateTime  @default(now())
   processedAt      DateTime?
   createdAt        DateTime  @default(now())
@@ -560,33 +477,31 @@ model WebhookLog {
   @@map("webhook_logs")
 }
 
-// Garder l'ancien modèle pour compatibilité (à supprimer plus tard)
 model CJWebhookLog {
   id        String   @id @default(cuid())
-  type      String // PRODUCT, STOCK, ORDER, LOGISTICS, VARIANT
+  type      String
   messageId String   @unique
-  payload   String   @db.Text // JSON string
+  payload   String
   processed Boolean  @default(false)
-  error     String?  @db.Text
-  action    String?  @default("pending") // pending, imported, ignored - Pour les produits en attente d'import
+  error     String?
   createdAt DateTime @default(now())
+  action    String?  @default("pending")
 
   @@index([type, processed])
   @@index([messageId])
-  @@index([type, action]) // Index pour filtrer les produits en attente
+  @@index([type, action])
   @@map("cj_webhook_logs")
 }
 
-// Notifications de mise à jour de produits via webhooks
 model ProductUpdateNotification {
   id               String    @id @default(cuid())
-  productId        String? // ID du produit KAMRI (peut être null si produit non importé)
-  cjProductId      String // ID produit CJ (pid)
-  cjVariantId      String? // ID variante CJ (vid) si c'est une variante
-  webhookType      String // PRODUCT, VARIANT, STOCK, etc.
-  webhookMessageId String // ID du message webhook
-  changes          String?  @db.Text // JSON string des champs modifiés
-  productName      String? // Nom du produit (pour affichage)
+  productId        String?
+  cjProductId      String
+  cjVariantId      String?
+  webhookType      String
+  webhookMessageId String
+  changes          String?
+  productName      String?
   isRead           Boolean   @default(false)
   createdAt        DateTime  @default(now())
   readAt           DateTime?
@@ -597,45 +512,30 @@ model ProductUpdateNotification {
   @@map("product_update_notifications")
 }
 
-// ✅ Modèle pour les demandes de sourcing CJ
 model CJSourcingRequest {
-  id String @id @default(cuid())
-
-  // IDs de référence
-  cjSourcingId String? @unique // ID CJ de la demande
-  sourceNumber String? // Numéro court de recherche
-
-  // IDs de votre système (optionnels)
-  thirdProductId  String? // Votre product ID
-  thirdVariantId  String? // Votre variant ID
-  thirdProductSku String? // Votre SKU
-
-  // Informations du produit demandé
-  productName  String // Nom du produit (requis)
-  productImage String // URL de l'image (requis)
-  productUrl   String? // URL du produit source (AliExpress, etc.)
-  price        Float? // Prix actuel
-  remark       String? @db.Text // Remarques (urgent, quantité, etc.)
-
-  // Statut de la recherche
-  status        String  @default("pending") // pending, processing, found, failed
-  statusChinese String? // Statut en chinois (de l'API)
-
-  // Résultat (si trouvé)
-  cjProductId       String? // Product ID CJ (quand trouvé)
-  cjVariantSku      String? // SKU du variant CJ (quand trouvé)
-  imported          Boolean @default(false) // Si déjà importé
-  importedProductId String? // ID du produit importé dans votre système
-
-  // Métadonnées
-  shopId   String? // ID de votre boutique
-  shopName String? // Nom de votre boutique
-
-  // Dates
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  lastCheckedAt DateTime? // Dernière vérification du statut
-  foundAt       DateTime? // Date de découverte du produit
+  id                String    @id @default(cuid())
+  cjSourcingId      String?   @unique
+  sourceNumber      String?
+  thirdProductId    String?
+  thirdVariantId    String?
+  thirdProductSku   String?
+  productName       String
+  productImage      String
+  productUrl        String?
+  price             Float?
+  remark            String?
+  status            String    @default("pending")
+  statusChinese     String?
+  cjProductId       String?
+  cjVariantSku      String?
+  imported          Boolean   @default(false)
+  importedProductId String?
+  shopId            String?
+  shopName          String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  lastCheckedAt     DateTime?
+  foundAt           DateTime?
 
   @@index([status])
   @@index([cjSourcingId])
@@ -643,29 +543,25 @@ model CJSourcingRequest {
   @@map("cj_sourcing_requests")
 }
 
-// ✅ Modèle pour stocker les recherches populaires
 model SearchHistory {
-  id        String   @id @default(cuid())
-  query     String   // Terme de recherche
-  count     Int      @default(1) // Nombre de fois recherché
-  lastSearchedAt DateTime @default(now()) // Dernière recherche
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String   @id @default(cuid())
+  query          String   @unique
+  count          Int      @default(1)
+  lastSearchedAt DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  @@unique([query])
   @@index([count])
   @@index([lastSearchedAt])
   @@map("search_history")
 }
 
-// ✅ Modèle pour stocker les taux de change
 model ExchangeRate {
   id        String   @id @default(cuid())
-  currency  String   @unique // Code devise (EUR, USD, XAF, XOF, CNY)
-  rate      Float    // Taux de change depuis USD (ex: 1 USD = 0.92 EUR)
-  updatedat DateTime @default(now()) @map("updatedat") // Dernière mise à jour (nom de colonne Railway en minuscules)
+  currency  String   @unique
+  rate      Float
+  updatedat DateTime @default(now()) @map("updatedat")
 
   @@index([currency])
   @@map("exchange_rates")
 }
-
