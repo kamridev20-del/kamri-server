@@ -415,6 +415,9 @@ model CJProductStore {
   isFreeShipping        Boolean?
   freeShippingCountries String?
   defaultShippingMethod String?
+  productProperty1      String?  @map("product_property1")
+  productProperty2      String?  @map("product_property2")
+  productProperty3      String?  @map("product_property3")
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
