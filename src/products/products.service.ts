@@ -121,12 +121,16 @@ export class ProductsService {
     let rating = product.rating;
     let reviews = product.reviewsCount;
     
-    if ((!rating || !reviews) && product.cjReviews) {
+    // Si pas de reviews dans notre table Review, utiliser cjReviews en fallback
+    if ((!rating || rating === 0 || !reviews || reviews === 0) && product.cjReviews) {
       try {
         const cjReviewsData = JSON.parse(product.cjReviews);
-        const calculated = this.calculateRatingFromReviews(cjReviewsData);
-        rating = calculated.rating;
-        reviews = calculated.count;
+        if (Array.isArray(cjReviewsData) && cjReviewsData.length > 0) {
+          const calculated = this.calculateRatingFromReviews(cjReviewsData);
+          // Utiliser cjReviews seulement si on a vraiment rien d'autre
+          if (!rating || rating === 0) rating = calculated.rating;
+          if (!reviews || reviews === 0) reviews = calculated.count;
+        }
       } catch (e) {
         // Ignore parsing errors
       }
@@ -179,36 +183,17 @@ export class ProductsService {
             properties: true,
           },
         },
-        reviews: {
-          select: {
-            rating: true,
-          },
-        },
       },
       orderBy: {
         createdAt: 'desc',
       },
     });
 
-    // ✅ Transformer les données pour le frontend et calculer le stock total + rating
+    // ✅ Transformer les données pour le frontend et calculer le stock total
     return products.map(product => {
-      // ✅ IMPORTANT : Calculer le rating AVANT processProductImages pour éviter qu'il soit écrasé
-      let averageRating = 0;
-      let reviewsCount = 0;
-      if (product.reviews && product.reviews.length > 0) {
-        reviewsCount = product.reviews.length;
-        const totalRating = product.reviews.reduce((sum, review) => sum + (review.rating || 0), 0);
-        averageRating = totalRating / reviewsCount;
-      }
-      
-      // Ajouter les valeurs calculées au produit AVANT de le traiter
-      const productWithRating = {
-        ...product,
-        rating: averageRating,
-        reviewsCount: reviewsCount
-      };
-      
-      const processed = this.processProductImages(productWithRating);
+      // ✅ Utiliser directement les champs rating et reviewsCount de la table Product
+      // Ces champs sont synchronisés depuis CJ via scheduleReviewsSync
+      const processed = this.processProductImages(product);
       
       // ✅ Calculer le stock total depuis les variants
       let totalStock = 0;
@@ -218,8 +203,7 @@ export class ProductsService {
       
       return { 
         ...processed, 
-        stock: totalStock,
-        reviews: reviewsCount  // S'assurer que reviews est bien le count
+        stock: totalStock
       };
     });
   }
@@ -241,35 +225,15 @@ export class ProductsService {
             status: true,
           },
         },
-        reviews: {
-          select: {
-            rating: true,
-          },
-        },
       },
       orderBy: {
         createdAt: 'desc',
       },
     });
 
-    // ✅ Transformer les données pour le frontend et calculer le stock total + rating
+    // ✅ Transformer les données pour le frontend et calculer le stock total
     return products.map(product => {
-      // ✅ IMPORTANT : Calculer le rating AVANT processProductImages
-      let averageRating = 0;
-      let reviewsCount = 0;
-      if (product.reviews && product.reviews.length > 0) {
-        reviewsCount = product.reviews.length;
-        const totalRating = product.reviews.reduce((sum, review) => sum + (review.rating || 0), 0);
-        averageRating = totalRating / reviewsCount;
-      }
-      
-      const productWithRating = {
-        ...product,
-        rating: averageRating,
-        reviewsCount: reviewsCount
-      };
-      
-      const processed = this.processProductImages(productWithRating);
+      const processed = this.processProductImages(product);
       
       // ✅ Calculer le stock total depuis les variants
       let totalStock = 0;
@@ -279,8 +243,7 @@ export class ProductsService {
       
       return { 
         ...processed, 
-        stock: totalStock,
-        reviews: reviewsCount
+        stock: totalStock
       };
     });
   }
@@ -329,22 +292,8 @@ export class ProductsService {
 
     if (!product) return null;
 
-    // ✅ IMPORTANT : Calculer le rating AVANT processProductImages
-    let averageRating = 0;
-    let reviewsCount = 0;
-    if (product.reviews && product.reviews.length > 0) {
-      reviewsCount = product.reviews.length;
-      const totalRating = product.reviews.reduce((sum, review) => sum + (review.rating || 0), 0);
-      averageRating = totalRating / reviewsCount;
-    }
-    
-    const productWithRating = {
-      ...product,
-      rating: averageRating,
-      reviewsCount: reviewsCount
-    };
-    
-    const processed = this.processProductImages(productWithRating);
+    // ✅ Utiliser directement les champs rating et reviewsCount de la table Product
+    const processed = this.processProductImages(product);
     
     // ✅ Calculer le stock total depuis les variants
     let totalStock = 0;
@@ -354,8 +303,7 @@ export class ProductsService {
     
     return { 
       ...processed, 
-      stock: totalStock,
-      reviews: reviewsCount
+      stock: totalStock
     };
   }
 
@@ -459,35 +407,15 @@ export class ProductsService {
           },
         },
         images: true,
-        reviews: {
-          select: {
-            rating: true,
-          },
-        },
       },
       orderBy: {
         createdAt: 'desc',
       },
     });
     
-    // ✅ Calculer le stock total depuis les variants + rating
+    // ✅ Calculer le stock total depuis les variants
     return products.map(product => {
-      // ✅ IMPORTANT : Calculer le rating AVANT processProductImages
-      let averageRating = 0;
-      let reviewsCount = 0;
-      if (product.reviews && product.reviews.length > 0) {
-        reviewsCount = product.reviews.length;
-        const totalRating = product.reviews.reduce((sum, review) => sum + (review.rating || 0), 0);
-        averageRating = totalRating / reviewsCount;
-      }
-      
-      const productWithRating = {
-        ...product,
-        rating: averageRating,
-        reviewsCount: reviewsCount
-      };
-      
-      const processed = this.processProductImages(productWithRating);
+      const processed = this.processProductImages(product);
       
       // Calculer le stock
       let totalStock = 0;
@@ -497,8 +425,7 @@ export class ProductsService {
       
       return { 
         ...processed, 
-        stock: totalStock,
-        reviews: reviewsCount
+        stock: totalStock
       };
     });
   }
@@ -648,32 +575,12 @@ export class ProductsService {
             properties: true,
           },
         },
-        reviews: {
-          select: {
-            rating: true,
-          },
-        },
       },
     });
 
-    // ✅ Transformer les données pour le frontend et calculer le stock total + rating
+    // ✅ Transformer les données pour le frontend et calculer le stock total
     return products.map(product => {
-      // ✅ IMPORTANT : Calculer le rating AVANT processProductImages
-      let averageRating = 0;
-      let reviewsCount = 0;
-      if (product.reviews && product.reviews.length > 0) {
-        reviewsCount = product.reviews.length;
-        const totalRating = product.reviews.reduce((sum, review) => sum + (review.rating || 0), 0);
-        averageRating = totalRating / reviewsCount;
-      }
-      
-      const productWithRating = {
-        ...product,
-        rating: averageRating,
-        reviewsCount: reviewsCount
-      };
-      
-      const processed = this.processProductImages(productWithRating);
+      const processed = this.processProductImages(product);
       
       // ✅ Calculer le stock total depuis les variants
       let totalStock = 0;
@@ -683,8 +590,7 @@ export class ProductsService {
       
       return { 
         ...processed, 
-        stock: totalStock,
-        reviews: reviewsCount
+        stock: totalStock
       };
     });
   }
@@ -2203,11 +2109,6 @@ export class ProductsService {
           },
         },
         cjMapping: true,
-        reviews: {
-          select: {
-            rating: true,
-          },
-        },
       },
       orderBy: {
         createdAt: 'desc'
@@ -2254,24 +2155,9 @@ export class ProductsService {
       })));
     }
     
-    // ✅ Transformer les données pour le frontend et calculer le stock total + rating
+    // ✅ Transformer les données pour le frontend et calculer le stock total
     return products.map(product => {
-      // ✅ IMPORTANT : Calculer le rating AVANT processProductImages
-      let averageRating = 0;
-      let reviewsCount = 0;
-      if (product.reviews && product.reviews.length > 0) {
-        reviewsCount = product.reviews.length;
-        const totalRating = product.reviews.reduce((sum, review) => sum + (review.rating || 0), 0);
-        averageRating = totalRating / reviewsCount;
-      }
-      
-      const productWithRating = {
-        ...product,
-        rating: averageRating,
-        reviewsCount: reviewsCount
-      };
-      
-      const processed = this.processProductImages(productWithRating);
+      const processed = this.processProductImages(product);
       
       // Calculer le stock total depuis les variants
       let totalStock = 0;
@@ -2281,8 +2167,7 @@ export class ProductsService {
       
       return { 
         ...processed, 
-        stock: totalStock,
-        reviews: reviewsCount
+        stock: totalStock
       };
     });
   }
