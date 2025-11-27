@@ -100,3 +100,5 @@ updateProductRatings()
     process.exit(1);
   });
 
+
+

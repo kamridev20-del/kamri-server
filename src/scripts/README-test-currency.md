@@ -79,3 +79,5 @@ Si les tests échouent :
 3. Vérifiez les logs du backend pour voir les erreurs
 4. Testez manuellement un endpoint avec Postman/curl
 
+
+

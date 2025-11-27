@@ -1,10 +1,10 @@
-import { BadRequestException, Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { CJAPIClient } from '../cj-dropshipping/cj-api-client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
-import { PrepareProductDto } from './dto/prepare-product.dto';
 import { EditProductDto } from './dto/edit-product.dto';
-import { CJAPIClient } from '../cj-dropshipping/cj-api-client';
+import { PrepareProductDto } from './dto/prepare-product.dto';
 
 @Injectable()
 export class ProductsService {

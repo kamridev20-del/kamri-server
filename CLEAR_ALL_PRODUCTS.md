@@ -61,3 +61,5 @@ Après avoir exécuté le script, vous pouvez :
 2. Créer de nouveaux produits manuellement
 3. Les catégories et utilisateurs restent intacts
 
+
+

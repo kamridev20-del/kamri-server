@@ -68,3 +68,5 @@ La colonne `imageUrl` est **optionnelle** (`String?`), donc :
 - ✅ Vous pouvez ajouter des images progressivement
 - ✅ Si une catégorie n'a pas d'image, l'icône sera utilisée par défaut
 
+
+
