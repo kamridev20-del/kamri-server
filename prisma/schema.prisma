@@ -98,6 +98,7 @@ model Product {
   originWarehouseId String?
   rating            Float?
   reviewsCount      Int?              @default(0)
+  productVideo      String?           // ✅ Vidéo du produit (JSON avec videoList)
   cartItems         CartItem[]
   cjMapping         CJProductMapping?
   images            Image[]

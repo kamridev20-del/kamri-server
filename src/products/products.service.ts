@@ -292,8 +292,17 @@ export class ProductsService {
 
     if (!product) return null;
 
+    // 🎬 DEBUG: Vérifier si productVideo existe
+    this.logger.log(`🎬 [findOne] productVideo avant processing: ${product.productVideo ? 'EXISTS' : 'NULL'}`);
+    if (product.productVideo) {
+      this.logger.log(`🎬 [findOne] productVideo value: ${product.productVideo.substring(0, 100)}`);
+    }
+
     // ✅ Utiliser directement les champs rating et reviewsCount de la table Product
     const processed = this.processProductImages(product);
+    
+    // 🎬 DEBUG: Vérifier si productVideo existe après processing
+    this.logger.log(`🎬 [findOne] productVideo après processing: ${processed.productVideo ? 'EXISTS' : 'NULL'}`);
     
     // ✅ Calculer le stock total depuis les variants
     let totalStock = 0;
@@ -301,10 +310,15 @@ export class ProductsService {
       totalStock = processed.productVariants.reduce((sum, v) => sum + (v.stock || 0), 0);
     }
     
-    return { 
+    const result = { 
       ...processed, 
       stock: totalStock
     };
+    
+    // 🎬 DEBUG: Vérifier si productVideo existe dans le résultat final
+    this.logger.log(`🎬 [findOne] productVideo dans result: ${result.productVideo ? 'EXISTS' : 'NULL'}`);
+    
+    return result;
   }
 
   async remove(id: string) {
