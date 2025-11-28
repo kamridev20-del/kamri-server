@@ -62,9 +62,9 @@ export class AuthService {
       role: user.role 
     };
 
-    // Décoder le token pour vérifier sa structure
-    const token = this.jwtService.sign(payload);
-    console.log('🎫 [AuthService] Token JWT généré');
+    // Générer le token avec expiration explicite de 7 jours
+    const token = this.jwtService.sign(payload, { expiresIn: '7d' });
+    console.log('🎫 [AuthService] Token JWT généré avec expiration de 7 jours');
     console.log('🔐 [AuthService] Token preview:', token.substring(0, 50) + '...');
     
     // Vérifier la structure du token
@@ -74,6 +74,11 @@ export class AuthService {
         const payloadDecoded = JSON.parse(Buffer.from(parts[1], 'base64').toString());
         console.log('📋 [AuthService] Payload du token:', payloadDecoded);
         console.log('📅 [AuthService] Token créé à:', new Date(payloadDecoded.iat * 1000));
+        if (payloadDecoded.exp) {
+          const expiryDate = new Date(payloadDecoded.exp * 1000);
+          console.log('⏰ [AuthService] Token expire à:', expiryDate);
+          console.log('⏰ [AuthService] Token valide pendant:', Math.round((payloadDecoded.exp - payloadDecoded.iat) / 3600), 'heures');
+        }
       }
     } catch (e) {
       console.error('❌ [AuthService] Erreur décodage token:', e);
@@ -122,7 +127,7 @@ export class AuthService {
     };
 
     return {
-      access_token: this.jwtService.sign(payload),
+      access_token: this.jwtService.sign(payload, { expiresIn: '7d' }),
       user: {
         id: user.id,
         email: user.email,

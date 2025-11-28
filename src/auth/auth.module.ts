@@ -18,7 +18,7 @@ import { JwtStrategy } from './jwt.strategy';
         console.log('🔐 [AuthModule] JWT_SECRET utilisé (via ConfigService):', secret ? secret.substring(0, 10) + '...' : 'DÉFAUT');
         return {
           secret,
-          signOptions: { expiresIn: '24h' },
+          signOptions: { expiresIn: '7d' },
         };
       },
       inject: [ConfigService],
