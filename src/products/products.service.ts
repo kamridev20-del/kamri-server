@@ -2216,6 +2216,20 @@ export class ProductsService {
     });
     
     console.log(`📋 [GET-DRAFT] ${products.length} produit(s) draft trouvé(s)`);
+    
+    // 🔍 DEBUG : Vérifier les champs multilingues
+    if (products.length > 0) {
+      const firstProduct = products[0];
+      console.log('🔍 [GET-DRAFT] Exemple produit (champs multilingues):', {
+        id: firstProduct.id,
+        name: firstProduct.name,
+        name_fr: (firstProduct as any).name_fr,
+        name_en: (firstProduct as any).name_en,
+        description_fr: (firstProduct as any).description_fr ? 'présente' : 'absente',
+        description_en: (firstProduct as any).description_en ? 'présente' : 'absente',
+      });
+    }
+    
     if (products.length > 0) {
       // Log détaillé avec catégories
       const productsByCategory = products.reduce((acc, p) => {
