@@ -89,6 +89,25 @@ export class ProductsService {
     }, 2000); // Attendre 2 secondes après la création du produit
   }
 
+  // ✅ Fonction utilitaire pour transformer un produit selon la langue
+  private transformProductForLanguage(product: any, lang: 'fr' | 'en' = 'fr') {
+    // Utiliser les champs multilingues si disponibles, sinon fallback sur name/description
+    const name = lang === 'fr' 
+      ? (product.name_fr || product.name) 
+      : (product.name_en || product.name);
+      
+    const description = lang === 'fr'
+      ? (product.description_fr || product.description)
+      : (product.description_en || product.description);
+
+    // Retourner le produit avec les champs traduits
+    return {
+      ...product,
+      name,        // Remplacer par la version traduite
+      description  // Remplacer par la version traduite
+    };
+  }
+
   // ✅ Fonction utilitaire pour traiter les images et formater la description
   private processProductImages(product: any) {
     let imageUrls: string[] = [];
@@ -165,7 +184,7 @@ export class ProductsService {
     });
   }
 
-  async findAll() {
+  async findAll(lang: 'fr' | 'en' = 'fr') {
     const products = await this.prisma.product.findMany({
       where: {
         status: 'active' // Seuls les produits validés
@@ -204,14 +223,17 @@ export class ProductsService {
       // Ces champs sont synchronisés depuis CJ via scheduleReviewsSync
       const processed = this.processProductImages(product);
       
+      // ✅ Appliquer la transformation multilingue
+      const translated = this.transformProductForLanguage(processed, lang);
+      
       // ✅ Calculer le stock total depuis les variants
       let totalStock = 0;
-      if (processed.productVariants && processed.productVariants.length > 0) {
-        totalStock = processed.productVariants.reduce((sum, v) => sum + (v.stock || 0), 0);
+      if (translated.productVariants && translated.productVariants.length > 0) {
+        totalStock = translated.productVariants.reduce((sum, v) => sum + (v.stock || 0), 0);
       }
       
       return { 
-        ...processed, 
+        ...translated, 
         stock: totalStock
       };
     });
@@ -257,7 +279,7 @@ export class ProductsService {
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, lang: 'fr' | 'en' = 'fr') {
     const product = await this.prisma.product.findUnique({
       where: { id },
       include: {
@@ -304,14 +326,17 @@ export class ProductsService {
     // ✅ Utiliser directement les champs rating et reviewsCount de la table Product
     const processed = this.processProductImages(product);
     
+    // ✅ Appliquer la transformation multilingue
+    const translated = this.transformProductForLanguage(processed, lang);
+    
     // ✅ Calculer le stock total depuis les variants
     let totalStock = 0;
-    if (processed.productVariants && processed.productVariants.length > 0) {
-      totalStock = processed.productVariants.reduce((sum, v) => sum + (v.stock || 0), 0);
+    if (translated.productVariants && translated.productVariants.length > 0) {
+      totalStock = translated.productVariants.reduce((sum, v) => sum + (v.stock || 0), 0);
     }
     
     return { 
-      ...processed, 
+      ...translated, 
       stock: totalStock
     };
   }
@@ -662,7 +687,7 @@ export class ProductsService {
   /**
    * Rechercher des produits et catégories dans la base de données
    */
-  async searchProductsAndCategories(query: string, limit: number = 10, includePopular: boolean = false) {
+  async searchProductsAndCategories(query: string, limit: number = 10, includePopular: boolean = false, lang: 'fr' | 'en' = 'fr') {
     const searchTerm = query ? query.trim().toLowerCase() : '';
 
     // Si pas de query, retourner les recherches populaires si demandé
@@ -768,12 +793,14 @@ export class ProductsService {
       // Transformer les produits pour le frontend
       const processedProducts = products.map(product => {
         const processed = this.processProductImages(product);
+        // ✅ Appliquer la transformation multilingue
+        const translated = this.transformProductForLanguage(processed, lang);
         // Calculer le stock total depuis les variants
-        if (processed.productVariants && processed.productVariants.length > 0) {
-          const totalStock = processed.productVariants.reduce((sum, v) => sum + (v.stock || 0), 0);
-          return { ...processed, stock: totalStock };
+        if (translated.productVariants && translated.productVariants.length > 0) {
+          const totalStock = translated.productVariants.reduce((sum, v) => sum + (v.stock || 0), 0);
+          return { ...translated, stock: totalStock };
         }
-        return processed;
+        return translated;
       });
 
       return {

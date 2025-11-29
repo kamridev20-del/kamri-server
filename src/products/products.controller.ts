@@ -38,11 +38,16 @@ export class ProductsController {
   @Get()
   @ApiOperation({ summary: 'Get all products' })
   @ApiResponse({ status: 200, description: 'Products retrieved successfully' })
-  findAll(@Query('category') category?: string) {
+  @ApiQuery({ name: 'lang', required: false, description: 'Language code (fr or en)', enum: ['fr', 'en'] })
+  findAll(
+    @Query('category') category?: string,
+    @Query('lang') lang?: 'fr' | 'en'
+  ) {
+    const language = lang === 'en' ? 'en' : 'fr'; // Default to 'fr'
     if (category) {
-      return this.productsService.findByCategory(category);
+      return this.productsService.findByCategory(category, language);
     }
-    return this.productsService.findAll();
+    return this.productsService.findAll(language);
   }
 
   @Get('search')
@@ -51,14 +56,17 @@ export class ProductsController {
   @ApiQuery({ name: 'q', required: false, description: 'Terme de recherche' })
   @ApiQuery({ name: 'limit', required: false, description: 'Nombre de résultats (défaut: 10)' })
   @ApiQuery({ name: 'popular', required: false, description: 'Inclure les recherches populaires si pas de query' })
+  @ApiQuery({ name: 'lang', required: false, description: 'Language code (fr or en)', enum: ['fr', 'en'] })
   async search(
     @Query('q') query?: string,
     @Query('limit') limit?: string,
-    @Query('popular') popular?: string
+    @Query('popular') popular?: string,
+    @Query('lang') lang?: 'fr' | 'en'
   ) {
     const resultLimit = limit ? parseInt(limit, 10) : 10;
     const includePopular = popular === 'true' || popular === '1';
-    return this.productsService.searchProductsAndCategories(query || '', resultLimit, includePopular);
+    const language = lang === 'en' ? 'en' : 'fr'; // Default to 'fr'
+    return this.productsService.searchProductsAndCategories(query || '', resultLimit, includePopular, language);
   }
 
   @Get('admin/all')
@@ -130,8 +138,13 @@ export class ProductsController {
   @Get(':id')
   @ApiOperation({ summary: 'Get a product by ID' })
   @ApiResponse({ status: 200, description: 'Product retrieved successfully' })
-  findOne(@Param('id') id: string) {
-    return this.productsService.findOne(id);
+  @ApiQuery({ name: 'lang', required: false, description: 'Language code (fr or en)', enum: ['fr', 'en'] })
+  findOne(
+    @Param('id') id: string,
+    @Query('lang') lang?: 'fr' | 'en'
+  ) {
+    const language = lang === 'en' ? 'en' : 'fr'; // Default to 'fr'
+    return this.productsService.findOne(id, language);
   }
 
   @Patch(':id')
