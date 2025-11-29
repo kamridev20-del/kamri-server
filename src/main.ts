@@ -18,10 +18,10 @@ async function bootstrap() {
 
   // Configuration CORS
   const isProduction = process.env.NODE_ENV === 'production';
+  let allowedOrigins: string[] = [];
   
   if (isProduction) {
     // Production : Utiliser les variables d'environnement
-    const allowedOrigins: string[] = [];
     if (process.env.FRONTEND_URL) {
       allowedOrigins.push(process.env.FRONTEND_URL);
       // Ajouter aussi sans trailing slash
@@ -50,7 +50,9 @@ async function bootstrap() {
       origin: allowedOrigins.length > 0 ? allowedOrigins : true, // Autoriser toutes les origines si aucune configurée
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+      exposedHeaders: ['Content-Length', 'Content-Type'],
+      maxAge: 86400, // Cache preflight requests for 24 hours
     });
   } else {
     // Développement : Autoriser toutes les origines locales
@@ -61,6 +63,22 @@ async function bootstrap() {
       allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     });
   }
+
+  // ✅ Middleware pour gérer les erreurs CORS même en cas d'erreur serveur
+  app.use((req, res, next) => {
+    // Ajouter les en-têtes CORS même en cas d'erreur
+    const origin = req.headers.origin;
+    if (origin) {
+      const isAllowed = isProduction 
+        ? (allowedOrigins.length > 0 ? allowedOrigins.includes(origin) : true)
+        : true;
+      if (isAllowed) {
+        res.header('Access-Control-Allow-Origin', origin);
+        res.header('Access-Control-Allow-Credentials', 'true');
+      }
+    }
+    next();
+  });
 
   // Security (après CORS)
   app.use(helmet({
