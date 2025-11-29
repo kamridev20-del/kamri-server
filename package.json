@@ -21,6 +21,7 @@
     "db:push:env": "powershell -ExecutionPolicy Bypass -File scripts/db-push-with-env.ps1",
     "db:seed": "ts-node prisma/seed.ts",
     "db:migrate": "prisma migrate dev",
+    "db:migrate:variant": "node scripts/apply-variant-migration.js",
     "db:studio": "prisma studio",
     "db:clear-products": "ts-node -r tsconfig-paths/register src/scripts/clear-all-products.ts",
     "db:clear-all-products": "ts-node -r tsconfig-paths/register src/scripts/clear-all-products.ts",

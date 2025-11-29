@@ -28,10 +28,15 @@ export class CartController {
     @Body('productId') productId: string,
     @Body('quantity') quantity: number = 1,
     @Body('variantId') variantId?: string,
+    @Body('variantDetails') variantDetails?: any,
   ) {
-    // Note: variantId est accepté mais pas encore stocké dans CartItem
-    // TODO: Ajouter variantId au modèle CartItem si nécessaire
-    return this.cartService.addToCart(user.userId, productId, quantity);
+    return this.cartService.addToCart(
+      user.userId,
+      productId,
+      quantity,
+      variantId,
+      variantDetails,
+    );
   }
 
   @Delete(':itemId')
