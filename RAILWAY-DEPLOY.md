@@ -67,12 +67,18 @@ openssl rand -hex 64
 
 ```bash
 # ⚠️ REMPLACEZ par votre secret généré ci-dessus
-railway variables set JWT_SECRET="votre_secret_jwt_super_securise_au_moins_64_caracteres_hexadecimaux"
+# Syntaxe correcte : --set "KEY=value"
+railway variables --set "JWT_SECRET=votre_secret_jwt_super_securise_au_moins_64_caracteres_hexadecimaux"
 
 # Autres variables
-railway variables set DATABASE_URL="postgresql://postgres:RkueXhTkRXgbycEzIaRnbrFSuWJoDvTq@crossover.proxy.rlwy.net:27215/railway"
-railway variables set NODE_ENV="production"
-railway variables set PORT="3001"
+railway variables --set "DATABASE_URL=postgresql://postgres:RkueXhTkRXgbycEzIaRnbrFSuWJoDvTq@crossover.proxy.rlwy.net:27215/railway"
+railway variables --set "NODE_ENV=production"
+railway variables --set "PORT=3001"
+```
+
+**Note :** Vous pouvez définir plusieurs variables en une seule commande :
+```bash
+railway variables --set "JWT_SECRET=votre_secret" --set "NODE_ENV=production" --set "PORT=3001"
 ```
 
 **Vérifier que JWT_SECRET est bien défini :**
