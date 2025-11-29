@@ -1863,6 +1863,16 @@ export class ProductsService {
       throw new BadRequestException('Seuls les produits en draft peuvent être édités');
     }
 
+    // 🔍 DEBUG : Logger les données reçues
+    this.logger.log(`📝 [editDraftProduct] Données reçues pour produit ${id}:`, {
+      name: editData.name,
+      name_fr: editData.name_fr,
+      name_en: editData.name_en,
+      description: editData.description ? 'présente' : 'absente',
+      description_fr: editData.description_fr ? 'présente' : 'absente',
+      description_en: editData.description_en ? 'présente' : 'absente',
+    });
+
     // 2. Préparer les données de mise à jour
     const updateData: any = {};
 
@@ -1871,9 +1881,25 @@ export class ProductsService {
       updateData.name = this.cleanProductName(editData.name);
     }
 
+    // Noms multilingues
+    if (editData.name_fr !== undefined) {
+      updateData.name_fr = editData.name_fr && editData.name_fr.trim() ? this.cleanProductName(editData.name_fr.trim()) : null;
+    }
+    if (editData.name_en !== undefined) {
+      updateData.name_en = editData.name_en && editData.name_en.trim() ? this.cleanProductName(editData.name_en.trim()) : null;
+    }
+
     // Description
     if (editData.description !== undefined) {
       updateData.description = this.formatProductDescription(editData.description);
+    }
+
+    // Descriptions multilingues
+    if (editData.description_fr !== undefined) {
+      updateData.description_fr = editData.description_fr && editData.description_fr.trim() ? this.formatProductDescription(editData.description_fr.trim()) : null;
+    }
+    if (editData.description_en !== undefined) {
+      updateData.description_en = editData.description_en && editData.description_en.trim() ? this.formatProductDescription(editData.description_en.trim()) : null;
     }
 
     // Marge et prix
@@ -1929,6 +1955,17 @@ export class ProductsService {
       updateData.editedBy = userId;
     }
 
+    // 🔍 DEBUG : Logger les données qui seront sauvegardées
+    this.logger.log(`💾 [editDraftProduct] Données à sauvegarder pour produit ${id}:`, {
+      name: updateData.name,
+      name_fr: updateData.name_fr,
+      name_en: updateData.name_en,
+      description: updateData.description ? 'présente' : 'absente',
+      description_fr: updateData.description_fr ? 'présente' : 'absente',
+      description_en: updateData.description_en ? 'présente' : 'absente',
+      keys: Object.keys(updateData),
+    });
+
     // 3. Mettre à jour le produit
     const updatedProduct = await this.prisma.product.update({
       where: { id },
@@ -1940,6 +1977,8 @@ export class ProductsService {
         cjMapping: true
       }
     });
+
+    this.logger.log(`✅ [editDraftProduct] Produit ${id} mis à jour avec succès`);
 
     return updatedProduct;
   }
