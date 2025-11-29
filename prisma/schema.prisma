@@ -57,6 +57,11 @@ model Product {
   id                String            @id @default(cuid())
   name              String
   description       String?
+  // ✅ Champs multilingues (FR/EN)
+  name_fr           String?
+  name_en           String?
+  description_fr    String?           @db.Text
+  description_en    String?           @db.Text
   price             Float
   originalPrice     Float?
   image             String?

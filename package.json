@@ -37,7 +37,8 @@
     "db:update-url": "powershell -ExecutionPolicy Bypass -File scripts/update-db-url.ps1",
     "db:migrate-to-postgres": "bash scripts/migrate-to-postgresql.sh",
     "db:migrate-data": "ts-node -r tsconfig-paths/register scripts/migrate-to-postgresql.ts",
-    "db:migrate-data:sqlite3": "ts-node -r tsconfig-paths/register scripts/migrate-with-sqlite3.ts"
+    "db:migrate-data:sqlite3": "ts-node -r tsconfig-paths/register scripts/migrate-with-sqlite3.ts",
+    "db:add-multilingual": "node scripts/add-multilingual-fields.js"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
@@ -86,7 +87,8 @@
     "ts-loader": "^9.4.3",
     "ts-node": "^10.9.1",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.1.3"
+    "typescript": "^5.1.3",
+    "pg": "^8.11.3"
   },
   "jest": {
     "moduleFileExtensions": [
