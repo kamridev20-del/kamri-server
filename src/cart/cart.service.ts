@@ -6,7 +6,7 @@ export class CartService {
   constructor(private prisma: PrismaService) {}
 
   async getCart(userId: string) {
-    return this.prisma.cartItem.findMany({
+    const cartItems = await this.prisma.cartItem.findMany({
       where: { userId },
       include: {
         product: {
@@ -19,6 +19,23 @@ export class CartService {
         variant: true, // ✅ Inclure le variant choisi
       },
     });
+    
+    // Logs pour debug
+    console.log('🛒 [CartService] getCart - Nombre d\'articles:', cartItems.length);
+    cartItems.forEach((item, index) => {
+      console.log(`🛒 [CartService] Article ${index + 1}:`, {
+        id: item.id,
+        productId: item.productId,
+        productName: item.product.name,
+        variantId: item.variantId,
+        variantDetails: item.variantDetails,
+        variantDetailsType: typeof item.variantDetails,
+        hasVariantDetails: !!item.variantDetails,
+        variantDetailsKeys: item.variantDetails ? Object.keys(item.variantDetails as any) : []
+      });
+    });
+    
+    return cartItems;
   }
 
   async addToCart(
@@ -28,6 +45,17 @@ export class CartService {
     variantId?: string,
     variantDetails?: any,
   ) {
+    console.log('🛒 [CartService] addToCart appelé:', {
+      userId,
+      productId,
+      quantity,
+      variantId,
+      variantDetails,
+      variantDetailsType: typeof variantDetails,
+      variantDetailsKeys: variantDetails ? Object.keys(variantDetails) : [],
+      variantDetailsStringified: variantDetails ? JSON.stringify(variantDetails) : 'null'
+    });
+    
     // Chercher un item existant avec le même productId et variantId (ou sans variantId)
     const existingItem = await this.prisma.cartItem.findFirst({
       where: {
@@ -37,9 +65,15 @@ export class CartService {
       },
     });
 
+    console.log('🛒 [CartService] Item existant trouvé:', {
+      exists: !!existingItem,
+      existingItemId: existingItem?.id,
+      existingVariantDetails: existingItem?.variantDetails
+    });
+
     if (existingItem) {
       // Mettre à jour la quantité et les détails du variant
-      return this.prisma.cartItem.update({
+      const updated = await this.prisma.cartItem.update({
         where: { id: existingItem.id },
         data: {
           quantity: {
@@ -57,9 +91,17 @@ export class CartService {
           variant: true, // ✅ Inclure le variant choisi
         },
       });
+      
+      console.log('✅ [CartService] Item mis à jour:', {
+        id: updated.id,
+        variantDetails: updated.variantDetails,
+        variantDetailsType: typeof updated.variantDetails
+      });
+      
+      return updated;
     } else {
       // Créer un nouvel item
-      return this.prisma.cartItem.create({
+      const created = await this.prisma.cartItem.create({
         data: {
           userId,
           productId,
@@ -77,6 +119,14 @@ export class CartService {
           variant: true, // ✅ Inclure le variant choisi
         },
       });
+      
+      console.log('✅ [CartService] Nouvel item créé:', {
+        id: created.id,
+        variantDetails: created.variantDetails,
+        variantDetailsType: typeof created.variantDetails
+      });
+      
+      return created;
     }
   }
 

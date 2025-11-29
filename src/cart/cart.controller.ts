@@ -30,6 +30,17 @@ export class CartController {
     @Body('variantId') variantId?: string,
     @Body('variantDetails') variantDetails?: any,
   ) {
+    console.log('🛒 [CartController] addToCart reçu:', {
+      userId: user.userId,
+      productId,
+      quantity,
+      variantId,
+      variantDetails,
+      variantDetailsType: typeof variantDetails,
+      variantDetailsKeys: variantDetails ? Object.keys(variantDetails) : [],
+      body: JSON.stringify({ productId, quantity, variantId, variantDetails })
+    });
+    
     return this.cartService.addToCart(
       user.userId,
       productId,
