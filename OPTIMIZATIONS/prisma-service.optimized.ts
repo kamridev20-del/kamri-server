@@ -1,3 +1,6 @@
+// ✅ VERSION OPTIMISÉE - PrismaService
+// Fichier source : src/prisma/prisma.service.ts
+
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 
@@ -8,7 +11,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   constructor() {
     super({
       // ✅ OPTIMISATION : Ne jamais logger 'query' (même en dev) pour réduire I/O
-      log: ['error'], // Seulement les erreurs, même en développement
+      log: process.env.NODE_ENV === 'production' 
+        ? ['error'] 
+        : ['error', 'warn'], // ⚠️ Retirer 'query' pour économiser les ressources
       // Configuration du pool de connexions pour éviter "too many clients"
       datasources: {
         db: {

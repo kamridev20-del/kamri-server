@@ -646,6 +646,26 @@ export class CJDropshippingController {
   async handleWebhook(@Body() dto: any, @Req() request: Request) {
     const startTime = Date.now();
     
+    // ✅ OPTIMISATION : Vérifier si les webhooks sont activés
+    const enableWebhooks = process.env.ENABLE_CJ_WEBHOOKS === 'true';
+    
+    if (!enableWebhooks) {
+      this.logger.warn('⚠️ Webhooks CJ Dropshipping désactivés - ENABLE_CJ_WEBHOOKS !== true');
+      this.logger.warn('💡 Pour activer : définir ENABLE_CJ_WEBHOOKS=true dans .env');
+      // ✅ Retourner une réponse valide pour CJ (évite les erreurs)
+      return {
+        code: 200,
+        result: true,
+        message: 'Webhooks disabled in test mode',
+        data: {
+          endpoint: '/api/cj-dropshipping/webhooks',
+          status: 'disabled',
+          timestamp: new Date().toISOString()
+        },
+        requestId: dto?.messageId || 'test-' + Date.now()
+      };
+    }
+    
     // ✅ Gérer les requêtes de test de CJ Dropshipping (sans body ou body vide)
     // CJ teste l'endpoint avant de le configurer - doit répondre IMMÉDIATEMENT (< 3s)
     if (!dto || Object.keys(dto).length === 0 || !dto.messageId) {

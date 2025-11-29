@@ -1,3 +1,6 @@
+// ✅ VERSION OPTIMISÉE - ProductViewersService
+// Fichier source : src/products/product-viewers.service.ts
+
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 
 interface Viewer {
@@ -18,17 +21,20 @@ export class ProductViewersService implements OnModuleDestroy {
   private cleanupInterval: NodeJS.Timeout | null = null;
 
   constructor() {
-    // ✅ OPTIMISATION : Désactiver complètement le service si ENABLE_VIEWER_TRACKING !== 'true'
+    // ✅ OPTIMISATION : Vérifier si le tracking est activé
     const enableViewerTracking = process.env.ENABLE_VIEWER_TRACKING === 'true';
     
     if (!enableViewerTracking) {
-      this.logger.warn('⚠️ ProductViewersService désactivé - ENABLE_VIEWER_TRACKING !== true');
-      this.logger.warn('💡 Pour activer : définir ENABLE_VIEWER_TRACKING=true dans .env');
+      this.logger.log('⚠️ ProductViewersService désactivé (mode test)');
+      this.logger.log('💡 Pour activer : définir ENABLE_VIEWER_TRACKING=true dans .env');
       return;
     }
     
-    // ✅ OPTIMISATION : Intervalle configurable (défaut 300000ms = 5 minutes au lieu de 10s)
-    const cleanupIntervalMs = parseInt(process.env.VIEWER_CLEANUP_INTERVAL || '300000', 10);
+    // ✅ OPTIMISATION : Intervalle configurable (défaut 60s au lieu de 10s)
+    const cleanupIntervalMs = parseInt(
+      process.env.VIEWER_CLEANUP_INTERVAL || '60000', // 60 secondes par défaut
+      10
+    );
     
     // Démarrer le nettoyage automatique
     this.cleanupInterval = setInterval(() => {
@@ -64,7 +70,6 @@ export class ProductViewersService implements OnModuleDestroy {
    * Retirer un viewer (quand l'utilisateur quitte la page)
    */
   removeViewer(productId: string, sessionId: string): number {
-    // ✅ Si désactivé, retourner 0 sans traitement
     if (!this.cleanupInterval) {
       return 0;
     }
@@ -89,7 +94,6 @@ export class ProductViewersService implements OnModuleDestroy {
    * Récupérer le nombre de viewers actifs pour un produit
    */
   getViewersCount(productId: string): number {
-    // ✅ Si désactivé, retourner 0 sans traitement
     if (!this.cleanupInterval) {
       return 0;
     }
@@ -132,6 +136,7 @@ export class ProductViewersService implements OnModuleDestroy {
   onModuleDestroy() {
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
     }
   }
 }

@@ -1,3 +1,6 @@
+// ✅ VERSION OPTIMISÉE - CurrencyScheduler
+// Fichier source : src/currency/currency.scheduler.ts
+
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { CurrencyService } from './currency.service';
 
@@ -10,17 +13,17 @@ export class CurrencyScheduler implements OnModuleInit {
 
   onModuleInit() {
     // ✅ OPTIMISATION : Vérifier si la synchronisation est activée
+    const isProduction = process.env.NODE_ENV === 'production';
     const enableCurrencySync = process.env.ENABLE_CURRENCY_SYNC === 'true';
     
-    if (!enableCurrencySync) {
-      this.logger.warn('⚠️ CurrencyScheduler désactivé - ENABLE_CURRENCY_SYNC !== true');
-      this.logger.warn('💡 Pour activer : définir ENABLE_CURRENCY_SYNC=true dans .env');
+    if (!isProduction || !enableCurrencySync) {
+      this.logger.log('⚠️ CurrencyScheduler désactivé (mode développement/test)');
+      this.logger.log('💡 Pour activer : définir ENABLE_CURRENCY_SYNC=true dans .env');
       return;
     }
     
     // ✅ Mise à jour initiale au démarrage (non bloquante)
     // On attend 30 secondes pour laisser l'application démarrer complètement
-    // et éviter de ralentir le démarrage avec des appels API externes
     setTimeout(() => {
       this.updateExchangeRates();
     }, 30000); // Délai de 30 secondes après le démarrage
@@ -62,3 +65,4 @@ export class CurrencyScheduler implements OnModuleInit {
     }
   }
 }
+

@@ -1,0 +1,51 @@
+# ✅ CONFIGURATION MODE TEST - ÉCONOMIE RESSOURCES
+# Copier ce contenu dans votre fichier .env Railway
+
+# ============================================
+# MODE DÉVELOPPEMENT ÉCONOMIQUE
+# ============================================
+
+# Environnement
+NODE_ENV=production  # ⚠️ Important : utiliser 'production' pour désactiver logs Prisma 'query'
+
+# ============================================
+# FEATURE FLAGS - DÉSACTIVER EN MODE TEST
+# ============================================
+
+# Synchronisation automatique des taux de change (toutes les 24h)
+ENABLE_CURRENCY_SYNC=false
+
+# Traitement des webhooks CJ Dropshipping
+ENABLE_CJ_WEBHOOKS=false
+
+# Synchronisation automatique des reviews produits
+ENABLE_REVIEW_SYNC=false
+
+# Tracking des viewers produits (nombre de personnes regardant)
+ENABLE_VIEWER_TRACKING=false
+
+# ============================================
+# CONFIGURATION INTERVALLES
+# ============================================
+
+# Intervalle de nettoyage des viewers inactifs (en millisecondes)
+# Défaut : 60000 (60 secondes) au lieu de 10000 (10 secondes)
+VIEWER_CLEANUP_INTERVAL=60000
+
+# ============================================
+# LOGS
+# ============================================
+
+# Logs verbeux pour debugging CJ API
+CJ_VERBOSE_LOGS=false
+
+# ============================================
+# POUR RÉACTIVATION À LA PUBLICATION
+# ============================================
+# Mettre toutes les variables ENABLE_* à true :
+#
+# ENABLE_CURRENCY_SYNC=true
+# ENABLE_CJ_WEBHOOKS=true
+# ENABLE_REVIEW_SYNC=true
+# ENABLE_VIEWER_TRACKING=true
+

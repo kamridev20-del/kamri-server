@@ -38,6 +38,15 @@ export class ProductsService {
 
   // ✅ Synchroniser les reviews CJ en arrière-plan après l'import
   private syncProductReviewsInBackground(productId: string, cjProductId: string): void {
+    // ✅ OPTIMISATION : Vérifier si la synchronisation est activée
+    const enableReviewSync = process.env.ENABLE_REVIEW_SYNC === 'true';
+    
+    if (!enableReviewSync) {
+      this.logger.warn(`⚠️ Synchronisation reviews désactivée pour produit ${productId} - ENABLE_REVIEW_SYNC !== true`);
+      this.logger.warn('💡 Pour activer : définir ENABLE_REVIEW_SYNC=true dans .env');
+      return;
+    }
+    
     // Lancer en arrière-plan sans bloquer avec setTimeout
     setTimeout(async () => {
       try {
