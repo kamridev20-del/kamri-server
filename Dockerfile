@@ -27,6 +27,7 @@ RUN npm run build
 # Exposer le port
 EXPOSE 3001
 
-# Commande de démarrage
-CMD ["npm", "run", "start:prod"]
+# Commande de démarrage - utiliser node directement pour une meilleure gestion des signaux
+# Cela permet à SIGTERM d'être correctement propagé à Node.js pour un arrêt propre
+CMD ["node", "dist/main"]
 

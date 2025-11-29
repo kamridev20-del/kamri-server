@@ -113,6 +113,23 @@ async function bootstrap() {
   console.log(`🚀 Server running on http://0.0.0.0:${port}`);
   console.log(`📚 API Documentation: http://0.0.0.0:${port}/api/docs`);
   console.log(`💚 Health check: http://0.0.0.0:${port}/api/health`);
+
+  // Gestion propre des signaux d'arrêt (SIGTERM, SIGINT)
+  // Permet au conteneur de s'arrêter proprement sans erreur npm
+  const gracefulShutdown = async (signal: string) => {
+    console.log(`\n🛑 Signal ${signal} reçu. Arrêt en cours...`);
+    try {
+      await app.close();
+      console.log('✅ Serveur arrêté proprement');
+      process.exit(0);
+    } catch (error) {
+      console.error('❌ Erreur lors de l\'arrêt:', error);
+      process.exit(1);
+    }
+  };
+
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 }
 
 bootstrap().catch((error) => {
