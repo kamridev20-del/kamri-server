@@ -10,12 +10,22 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private authService: AuthService,
     private configService: ConfigService,
   ) {
-    const secret = configService.get<string>('JWT_SECRET') || 'kamri-secret-key';
-    console.log('🔐 [JwtStrategy] Initialisation avec secret (via ConfigService):', secret ? secret.substring(0, 10) + '...' : 'DÉFAUT');
+    const secret = configService.get<string>('JWT_SECRET');
+    const isProduction = configService.get<string>('NODE_ENV') === 'production';
+    
+    // Utiliser le même secret que dans AuthModule
+    const finalSecret = secret || (isProduction ? null : 'kamri-secret-key-dev-only');
+    
+    if (!finalSecret && isProduction) {
+      console.error('❌ [JwtStrategy] ERREUR: JWT_SECRET non défini en production!');
+      throw new Error('JWT_SECRET must be defined in production environment');
+    }
+    
+    console.log('🔐 [JwtStrategy] Initialisation avec secret:', finalSecret ? finalSecret.substring(0, 10) + '...' : 'DÉFAUT');
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: secret,
+      secretOrKey: finalSecret,
     });
   }
 

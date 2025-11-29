@@ -14,10 +14,28 @@ import { JwtStrategy } from './jwt.strategy';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => {
-        const secret = configService.get<string>('JWT_SECRET') || 'kamri-secret-key';
-        console.log('🔐 [AuthModule] JWT_SECRET utilisé (via ConfigService):', secret ? secret.substring(0, 10) + '...' : 'DÉFAUT');
+        const secret = configService.get<string>('JWT_SECRET');
+        const isProduction = configService.get<string>('NODE_ENV') === 'production';
+        
+        // ⚠️ En production, JWT_SECRET DOIT être défini
+        if (isProduction && !secret) {
+          console.error('❌ [AuthModule] ERREUR CRITIQUE: JWT_SECRET non défini en production!');
+          console.error('❌ Les tokens JWT deviendront invalides à chaque redémarrage!');
+          console.error('❌ Définissez JWT_SECRET dans Railway: railway variables set JWT_SECRET="votre_secret"');
+          throw new Error('JWT_SECRET must be defined in production environment');
+        }
+        
+        // En développement, utiliser un secret par défaut si non défini
+        const finalSecret = secret || 'kamri-secret-key-dev-only';
+        
+        if (isProduction) {
+          console.log('🔐 [AuthModule] JWT_SECRET utilisé (PRODUCTION):', finalSecret.substring(0, 10) + '...');
+        } else {
+          console.log('🔐 [AuthModule] JWT_SECRET utilisé (DEV):', finalSecret.substring(0, 10) + '...');
+        }
+        
         return {
-          secret,
+          secret: finalSecret,
           signOptions: { expiresIn: '7d' },
         };
       },

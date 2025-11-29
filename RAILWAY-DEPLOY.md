@@ -47,12 +47,41 @@ Puis sélectionnez votre projet et votre base de données.
 
 ### 5. Configurer les variables d'environnement
 
+**⚠️ IMPORTANT : JWT_SECRET doit être défini et identique à chaque redéploiement !**
+
+Si `JWT_SECRET` n'est pas défini ou change, tous les tokens JWT existants deviendront invalides.
+
+**Générer un secret JWT sécurisé :**
+
 ```bash
+# Option 1 : Node.js
+node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+
+# Option 2 : OpenSSL
+openssl rand -hex 64
+
+# Option 3 : En ligne (https://generate-secret.vercel.app/64)
+```
+
+**Configurer dans Railway :**
+
+```bash
+# ⚠️ REMPLACEZ par votre secret généré ci-dessus
+railway variables set JWT_SECRET="votre_secret_jwt_super_securise_au_moins_64_caracteres_hexadecimaux"
+
+# Autres variables
 railway variables set DATABASE_URL="postgresql://postgres:RkueXhTkRXgbycEzIaRnbrFSuWJoDvTq@crossover.proxy.rlwy.net:27215/railway"
-railway variables set JWT_SECRET="votre_secret_jwt_super_securise_au_moins_32_caracteres"
 railway variables set NODE_ENV="production"
 railway variables set PORT="3001"
 ```
+
+**Vérifier que JWT_SECRET est bien défini :**
+
+```bash
+railway variables
+```
+
+Vous devriez voir `JWT_SECRET` dans la liste. Si ce n'est pas le cas, le serveur utilisera un secret par défaut et les tokens deviendront invalides à chaque redémarrage !
 
 Ou créez un fichier `.env` et utilisez :
 
