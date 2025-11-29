@@ -582,7 +582,7 @@ export class ProductsService {
     };
   }
 
-  async findByCategory(categoryId: string) {
+  async findByCategory(categoryId: string, lang: 'fr' | 'en' = 'fr') {
     const products = await this.prisma.product.findMany({
       where: { 
         categoryId,
@@ -615,6 +615,7 @@ export class ProductsService {
     // ✅ Transformer les données pour le frontend et calculer le stock total
     return products.map(product => {
       const processed = this.processProductImages(product);
+      const translated = this.transformProductForLanguage(processed, lang);
       
       // ✅ Calculer le stock total depuis les variants
       let totalStock = 0;
@@ -623,7 +624,7 @@ export class ProductsService {
       }
       
       return { 
-        ...processed, 
+        ...translated, 
         stock: totalStock
       };
     });
