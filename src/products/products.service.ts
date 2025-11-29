@@ -1025,55 +1025,67 @@ export class ProductsService {
         : (cjProduct.productImage || '[]');
 
       // ✅ Créer le produit avec TOUTES les données CJ
-      const product = await this.prisma.product.create({
-        data: {
-          name: cjProduct.productNameEn || cjProduct.productName,
-          description: cjProduct.productDescriptionEn || cjProduct.productDescription || '',
-          price: parseFloat(selectedVariant.variantSellPrice || selectedVariant.sellPrice || '0'),
-          originalPrice: parseFloat(selectedVariant.originalPrice || selectedVariant.variantOriginalPrice || '0'),
-          image: productImage,
-          categoryId,
-          supplierId,
-          externalCategory: cjProduct.categoryName,
-          source: 'cj-dropshipping',
-          status: 'draft',
-          stock: selectedVariant.stock || 0,
-          
-          // ✅ TOUTES les données CJ détaillées
-          cjProductId: pid,
-          productSku: cjProduct.productSku || '',
-          productWeight: cjProduct.productWeight || null,
-          packingWeight: cjProduct.packingWeight || null,
-          productType: cjProduct.productType || null,
-          productUnit: cjProduct.productUnit || null,
-          productKeyEn: cjProduct.productKeyEn || null,
-          materialNameEn: cjProduct.materialNameEn || null,
-          packingNameEn: cjProduct.packingNameEn || null,
-          suggestSellPrice: cjProduct.suggestSellPrice || null,
-          listedNum: cjProduct.listedNum || null,
-          supplierName: cjProduct.supplierName || null,
-          createrTime: cjProduct.createrTime || null,
-          variants: JSON.stringify(cjProduct.variants || []), // ✅ Sauvegarder tous les variants en JSON
-          cjReviews: JSON.stringify(cjProduct.reviews || cjProduct.cjReviews || []),
-          dimensions: cjProduct.dimensions || null,
-          brand: cjProduct.brand || null,
-          tags: JSON.stringify(cjProduct.tags || []),
-          
-          // ✅ Calculer et stocker le rating et le nombre d'avis
-          ...(() => {
-            const reviewsData = cjProduct.reviews || cjProduct.cjReviews || [];
-            const { rating, count } = this.calculateRatingFromReviews(reviewsData);
-            return { rating, reviewsCount: count };
-          })(),
-          
-          // ✅ Créer le mapping CJ
-          cjMapping: {
-            create: {
-              cjProductId: pid,
-              cjSku: variantSku
-            }
+      // ✅ Copier automatiquement les données anglaises depuis CJ
+      const englishName = cjProduct.productNameEn || cjProduct.productName;
+      const englishDescription = cjProduct.productDescriptionEn || cjProduct.productDescription || '';
+      
+      // ✅ Préparer les données avec les champs multilingues
+      const productData: any = {
+        name: englishName, // Nom par défaut (anglais)
+        description: englishDescription, // Description par défaut (anglais)
+        // ✅ Copier automatiquement les données anglaises depuis CJ
+        name_en: englishName, // ✅ Copier automatiquement en anglais
+        name_fr: null, // ✅ À remplir par l'admin lors de l'édition
+        description_en: englishDescription, // ✅ Copier automatiquement en anglais
+        description_fr: null, // ✅ À remplir par l'admin lors de l'édition
+        price: parseFloat(selectedVariant.variantSellPrice || selectedVariant.sellPrice || '0'),
+        originalPrice: parseFloat(selectedVariant.originalPrice || selectedVariant.variantOriginalPrice || '0'),
+        image: productImage,
+        categoryId,
+        supplierId,
+        externalCategory: cjProduct.categoryName,
+        source: 'cj-dropshipping',
+        status: 'draft',
+        stock: selectedVariant.stock || 0,
+        
+        // ✅ TOUTES les données CJ détaillées
+        cjProductId: pid,
+        productSku: cjProduct.productSku || '',
+        productWeight: cjProduct.productWeight || null,
+        packingWeight: cjProduct.packingWeight || null,
+        productType: cjProduct.productType || null,
+        productUnit: cjProduct.productUnit || null,
+        productKeyEn: cjProduct.productKeyEn || null,
+        materialNameEn: cjProduct.materialNameEn || null,
+        packingNameEn: cjProduct.packingNameEn || null,
+        suggestSellPrice: cjProduct.suggestSellPrice || null,
+        listedNum: cjProduct.listedNum || null,
+        supplierName: cjProduct.supplierName || null,
+        createrTime: cjProduct.createrTime || null,
+        variants: JSON.stringify(cjProduct.variants || []), // ✅ Sauvegarder tous les variants en JSON
+        cjReviews: JSON.stringify(cjProduct.reviews || cjProduct.cjReviews || []),
+        dimensions: cjProduct.dimensions || null,
+        brand: cjProduct.brand || null,
+        tags: JSON.stringify(cjProduct.tags || []),
+        
+        // ✅ Calculer et stocker le rating et le nombre d'avis
+        ...(() => {
+          const reviewsData = cjProduct.reviews || cjProduct.cjReviews || [];
+          const { rating, count } = this.calculateRatingFromReviews(reviewsData);
+          return { rating, reviewsCount: count };
+        })(),
+        
+        // ✅ Créer le mapping CJ
+        cjMapping: {
+          create: {
+            cjProductId: pid,
+            cjSku: variantSku
           }
-        },
+        }
+      };
+      
+      const product = await this.prisma.product.create({
+        data: productData,
         include: {
           category: true,
           supplier: true,
@@ -1635,9 +1647,14 @@ export class ProductsService {
     const calculatedPrice = this.calculatePriceWithMargin(originalPrice, margin);
 
     // 5. Préparer les données pour Product
+    // ✅ Copier automatiquement les données anglaises depuis CJ
     const productData: any = {
-      name: cleanedName,
-      description: cleanedDescription,
+      name: cleanedName, // Nom par défaut (anglais)
+      name_en: cleanedName, // ✅ Copier automatiquement en anglais
+      name_fr: null, // ✅ À remplir par l'admin lors de l'édition
+      description: cleanedDescription, // Description par défaut (anglais)
+      description_en: cleanedDescription, // ✅ Copier automatiquement en anglais
+      description_fr: null, // ✅ À remplir par l'admin lors de l'édition
       price: calculatedPrice,
       originalPrice: originalPrice,
       image: cjProduct.image,
@@ -2092,6 +2109,13 @@ export class ProductsService {
 
     if (product.price <= 0) {
       throw new BadRequestException('Un prix valide est requis pour publier le produit');
+    }
+
+    // ✅ Vérification optionnelle : s'assurer qu'on a au moins une traduction
+    // (Avertissement mais ne bloque pas la publication)
+    const productWithTranslations = product as any;
+    if (!productWithTranslations.name_fr && !productWithTranslations.name_en) {
+      this.logger.warn(`⚠️ Produit ${id} publié sans traduction française ni anglaise`);
     }
 
     // 3. Passer à active

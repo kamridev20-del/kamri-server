@@ -2,15 +2,35 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsNumber, IsOptional, IsArray, Min, Max } from 'class-validator';
 
 export class EditProductDto {
-  @ApiProperty({ description: 'Nom du produit', required: false })
+  @ApiProperty({ description: 'Nom du produit (défaut)', required: false })
   @IsOptional()
   @IsString()
   name?: string;
 
-  @ApiProperty({ description: 'Description du produit', required: false })
+  @ApiProperty({ description: 'Nom du produit en français', required: false })
+  @IsOptional()
+  @IsString()
+  name_fr?: string;
+
+  @ApiProperty({ description: 'Nom du produit en anglais', required: false })
+  @IsOptional()
+  @IsString()
+  name_en?: string;
+
+  @ApiProperty({ description: 'Description du produit (défaut)', required: false })
   @IsOptional()
   @IsString()
   description?: string;
+
+  @ApiProperty({ description: 'Description du produit en français', required: false })
+  @IsOptional()
+  @IsString()
+  description_fr?: string;
+
+  @ApiProperty({ description: 'Description du produit en anglais', required: false })
+  @IsOptional()
+  @IsString()
+  description_en?: string;
 
   @ApiProperty({ description: 'Marge à appliquer (%)', required: false })
   @IsOptional()
