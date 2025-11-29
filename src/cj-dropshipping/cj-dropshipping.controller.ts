@@ -37,7 +37,10 @@ import { CJProductService } from './services/cj-product.service';
 // @UseGuards(JwtAuthGuard) // Temporairement désactivé pour les tests
 // @ApiBearerAuth()
 export class CJDropshippingController {
-  private readonly logger = new Logger(CJDropshippingController.name);
+  private readonly logger = new Logger(CJDropshippingController.name)
+  // ✅ Throttling pour éviter de polluer les logs avec les webhooks désactivés
+  private static lastWebhookDisabledLog = 0;
+  private static readonly WEBHOOK_DISABLED_LOG_INTERVAL = 60000; // Logger max 1 fois par minute;
   
   constructor(
     private readonly cjMainService: CJMainService, // 🔧 SERVICE REFACTORISÉ
@@ -650,8 +653,14 @@ export class CJDropshippingController {
     const enableWebhooks = process.env.ENABLE_CJ_WEBHOOKS === 'true';
     
     if (!enableWebhooks) {
-      this.logger.warn('⚠️ Webhooks CJ Dropshipping désactivés - ENABLE_CJ_WEBHOOKS !== true');
-      this.logger.warn('💡 Pour activer : définir ENABLE_CJ_WEBHOOKS=true dans .env');
+      // ✅ Throttling : Logger seulement 1 fois par minute pour éviter de polluer les logs
+      const now = Date.now();
+      if (now - CJDropshippingController.lastWebhookDisabledLog > CJDropshippingController.WEBHOOK_DISABLED_LOG_INTERVAL) {
+        this.logger.warn('⚠️ Webhooks CJ Dropshipping désactivés - ENABLE_CJ_WEBHOOKS !== true');
+        this.logger.warn('💡 Pour activer : définir ENABLE_CJ_WEBHOOKS=true dans .env');
+        this.logger.warn('💡 Les webhooks suivants seront ignorés silencieusement (log toutes les 60s)');
+        CJDropshippingController.lastWebhookDisabledLog = now;
+      }
       // ✅ Retourner une réponse valide pour CJ (évite les erreurs)
       return {
         code: 200,

@@ -42,8 +42,8 @@ export class ProductsService {
     const enableReviewSync = process.env.ENABLE_REVIEW_SYNC === 'true';
     
     if (!enableReviewSync) {
-      this.logger.warn(`⚠️ Synchronisation reviews désactivée pour produit ${productId} - ENABLE_REVIEW_SYNC !== true`);
-      this.logger.warn('💡 Pour activer : définir ENABLE_REVIEW_SYNC=true dans .env');
+      // ✅ Utiliser debug au lieu de warn pour éviter de polluer les logs
+      this.logger.debug(`⚠️ Synchronisation reviews désactivée pour produit ${productId} - ENABLE_REVIEW_SYNC !== true`);
       return;
     }
     
