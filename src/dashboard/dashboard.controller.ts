@@ -1,5 +1,5 @@
-import { Controller, Get, UseGuards, Logger } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Controller, Get, Query, UseGuards, Logger } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { DashboardService } from './dashboard.service';
 
@@ -73,6 +73,33 @@ export class DashboardController {
   @ApiResponse({ status: 200, description: 'Données du graphique récupérées avec succès' })
   getSalesChart() {
     return this.dashboardService.getSalesChart();
+  }
+
+  @Get('visit-stats')
+  @ApiOperation({ summary: 'Récupérer les statistiques de visites par pays' })
+  @ApiResponse({ status: 200, description: 'Statistiques de visites récupérées avec succès' })
+  async getVisitStats(@Query('days') days?: string) {
+    try {
+      const daysNumber = days ? parseInt(days, 10) : 30;
+      const [statsByCountry, recentVisits, totals] = await Promise.all([
+        this.dashboardService.getVisitStatsByCountry(daysNumber),
+        this.dashboardService.getRecentVisits(20),
+        this.dashboardService.getVisitTotals(daysNumber),
+      ]);
+
+      return {
+        statsByCountry,
+        recentVisits,
+        totals,
+      };
+    } catch (error) {
+      this.logger.error('❌ Erreur récupération stats visites:', error);
+      return {
+        statsByCountry: [],
+        recentVisits: [],
+        totals: { totalVisits: 0, uniqueVisitors: 0 },
+      };
+    }
   }
 
   @Get('top-categories')

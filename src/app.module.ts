@@ -22,6 +22,7 @@ import { SuppliersModule } from './suppliers/suppliers.module';
 import { UploadModule } from './upload/upload.module';
 import { UserSettingsModule } from './user-settings/user-settings.module';
 import { UsersModule } from './users/users.module';
+import { VisitsModule } from './visits/visits.module';
 import { WishlistModule } from './wishlist/wishlist.module';
 
 @Module({
@@ -70,6 +71,7 @@ import { WishlistModule } from './wishlist/wishlist.module';
     ShippingModule, // ✅ Module validation livraison
     UploadModule, // ✅ Module upload d'images
     CurrencyModule, // ✅ Module gestion des devises
+    VisitsModule, // ✅ Module tracking des visites
   ],
 })
 export class AppModule {}

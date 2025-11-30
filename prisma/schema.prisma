@@ -579,3 +579,25 @@ model ExchangeRate {
   @@index([currency])
   @@map("exchange_rates")
 }
+
+model Visit {
+  id          String   @id @default(cuid())
+  ip          String?
+  countryCode String
+  countryName String
+  city        String?
+  region      String?
+  userAgent   String?  @db.Text
+  path        String?  // Page visitée (ex: /products, /categories)
+  referer     String?  @db.Text
+  language    String?  // Langue du navigateur
+  isAuthenticated Boolean @default(false)
+  userId      String?  // ID utilisateur si connecté
+  createdAt   DateTime @default(now())
+
+  @@index([countryCode])
+  @@index([createdAt])
+  @@index([countryCode, createdAt])
+  @@index([userId])
+  @@map("visits")
+}

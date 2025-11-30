@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SuppliersService } from '../suppliers/suppliers.service';
+import { VisitsService } from '../visits/visits.service';
 
 @Injectable()
 export class DashboardService {
@@ -9,7 +10,8 @@ export class DashboardService {
 
   constructor(
     private prisma: PrismaService,
-    private suppliersService: SuppliersService
+    private suppliersService: SuppliersService,
+    private visitsService: VisitsService,
   ) {}
 
   async getStats() {
@@ -242,6 +244,53 @@ export class DashboardService {
       recentOrders,
       recentProducts,
     };
+  }
+
+  /**
+   * Récupère les statistiques de visites par pays
+   */
+  async getVisitStatsByCountry(days: number = 30) {
+    try {
+      return await this.visitsService.getVisitStatsByCountry(days);
+    } catch (error) {
+      this.logger.error('❌ Erreur récupération stats visites par pays:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Récupère les dernières visites
+   */
+  async getRecentVisits(limit: number = 20) {
+    try {
+      return await this.visitsService.getRecentVisits(limit);
+    } catch (error) {
+      this.logger.error('❌ Erreur récupération visites récentes:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Récupère les totaux de visites
+   */
+  async getVisitTotals(days?: number) {
+    try {
+      const [totalVisits, uniqueVisitors] = await Promise.all([
+        this.visitsService.getTotalVisits(days),
+        this.visitsService.getUniqueVisitors(days),
+      ]);
+
+      return {
+        totalVisits,
+        uniqueVisitors,
+      };
+    } catch (error) {
+      this.logger.error('❌ Erreur récupération totaux visites:', error);
+      return {
+        totalVisits: 0,
+        uniqueVisitors: 0,
+      };
+    }
   }
 
   async getSalesChart() {
