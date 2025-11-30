@@ -11,17 +11,21 @@ export class DashboardService {
 
   async getStats() {
     try {
+      console.log('📊 [DashboardService] getStats appelé');
+      
       // S'assurer que le fournisseur CJ Dropshipping existe et est connecté
       try {
         await this.suppliersService.ensureCJSupplierExists();
       } catch (error) {
-        console.warn('Impossible de créer/vérifier le fournisseur CJ:', error);
+        console.warn('⚠️ [DashboardService] Impossible de créer/vérifier le fournisseur CJ:', error);
       }
       
       const now = new Date();
       const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
       const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+      
+      console.log('📊 [DashboardService] Exécution des requêtes Prisma...');
       
       const [
         totalProducts,
@@ -118,13 +122,25 @@ export class DashboardService {
       }),
     ]);
 
+      console.log('✅ [DashboardService] Requêtes Prisma terminées');
+      console.log('📊 [DashboardService] Résultats:', {
+        totalProducts,
+        promoProducts,
+        totalOrders,
+        connectedSuppliers,
+        totalUsers,
+        activeUsers,
+        totalRevenue: totalRevenue?._sum?.total,
+        monthlyRevenue: monthlyRevenue?._sum?.total,
+      });
+
       // Calculer les pourcentages de changement
       const calculateChange = (current: number, previous: number) => {
         if (previous === 0) return current > 0 ? 100 : 0;
         return ((current - previous) / previous) * 100;
       };
 
-      return {
+      const result = {
         totalProducts: totalProducts || 0,
         promoProducts: promoProducts || 0,
         totalOrders: totalOrders || 0,
@@ -142,8 +158,13 @@ export class DashboardService {
           revenue: calculateChange(monthlyRevenue?._sum?.total || 0, lastMonthRevenue?._sum?.total || 0),
         },
       };
+
+      console.log('✅ [DashboardService] Stats calculées et retournées');
+      return result;
     } catch (error) {
       console.error('❌ [DashboardService] Erreur dans getStats:', error);
+      console.error('❌ [DashboardService] Stack:', error instanceof Error ? error.stack : 'N/A');
+      console.error('❌ [DashboardService] Message:', error instanceof Error ? error.message : String(error));
       // Retourner des valeurs par défaut en cas d'erreur
       return {
         totalProducts: 0,
@@ -232,38 +253,49 @@ export class DashboardService {
 
   async getTopCategories() {
     try {
-      // ✅ Syntaxe Prisma correcte pour compter les produits actifs par catégorie
+      console.log('📊 [DashboardService] getTopCategories appelé');
+      
+      // ✅ Récupérer toutes les catégories
       const categories = await this.prisma.category.findMany({
-        include: {
-          _count: {
-            select: { 
-              products: true
-            },
-          },
-        },
-        take: 7,
+        take: 20, // Prendre plus pour avoir un meilleur tri
       });
 
-      // Filtrer et compter les produits actifs manuellement
-      const categoriesWithActiveCount = await Promise.all(
+      console.log(`📊 [DashboardService] ${categories.length} catégories trouvées`);
+
+      // ✅ Compter les produits actifs pour chaque catégorie
+      const categoriesWithCount = await Promise.all(
         categories.map(async (category) => {
-          const activeCount = await this.prisma.product.count({
-            where: {
-              categoryId: category.id,
-              status: 'active',
-            },
-          });
-          return {
-            name: category.name,
-            productCount: activeCount,
-          };
+          try {
+            const activeCount = await this.prisma.product.count({
+              where: {
+                categoryId: category.id,
+                status: 'active',
+              },
+            });
+            return {
+              name: category.name,
+              productCount: activeCount,
+            };
+          } catch (error) {
+            console.error(`❌ [DashboardService] Erreur comptage produits catégorie ${category.id}:`, error);
+            return {
+              name: category.name,
+              productCount: 0,
+            };
+          }
         })
       );
 
-      // Trier par nombre de produits actifs (décroissant)
-      return categoriesWithActiveCount.sort((a, b) => b.productCount - a.productCount);
+      // ✅ Trier par nombre de produits actifs (décroissant) et prendre les 7 premiers
+      const sorted = categoriesWithCount
+        .sort((a, b) => b.productCount - a.productCount)
+        .slice(0, 7);
+
+      console.log(`✅ [DashboardService] Top catégories retournées:`, sorted);
+      return sorted;
     } catch (error) {
       console.error('❌ [DashboardService] Erreur dans getTopCategories:', error);
+      console.error('❌ [DashboardService] Stack:', error instanceof Error ? error.stack : 'N/A');
       // Retourner un tableau vide en cas d'erreur
       return [];
     }
