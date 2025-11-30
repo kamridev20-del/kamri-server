@@ -19,6 +19,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // Utiliser le même secret que dans AuthModule
     const finalSecret = secret || (isProduction ? null : 'kamri-secret-key-dev-only');
     
+    // ✅ Appeler super() en premier (obligatoire en TypeScript)
+    super({
+      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      ignoreExpiration: false,
+      secretOrKey: finalSecret,
+    });
+    
+    // ✅ Maintenant on peut utiliser this.logger
     if (!finalSecret && isProduction) {
       this.logger.error('❌ ERREUR: JWT_SECRET non défini en production!');
       throw new Error('JWT_SECRET must be defined in production environment');
@@ -28,11 +36,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!isProduction) {
       this.logger.log(`🔐 Initialisation avec secret: ${finalSecret ? finalSecret.substring(0, 10) + '...' : 'DÉFAUT'}`);
     }
-    super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-      ignoreExpiration: false,
-      secretOrKey: finalSecret,
-    });
   }
 
   async validate(payload: any) {
