@@ -155,23 +155,34 @@ export class AuthService {
   }
 
   async getProfile(userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        status: true,
-        createdAt: true,
-      },
-    });
+    try {
+      console.log('👤 [AuthService] getProfile appelé pour userId:', userId);
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          status: true,
+          createdAt: true,
+        },
+      });
 
-    if (!user) {
-      throw new UnauthorizedException('Utilisateur non trouvé');
+      if (!user) {
+        console.warn('⚠️ [AuthService] Utilisateur non trouvé:', userId);
+        throw new UnauthorizedException('Utilisateur non trouvé');
+      }
+
+      console.log('✅ [AuthService] Profil récupéré avec succès');
+      return user;
+    } catch (error) {
+      console.error('❌ [AuthService] Erreur dans getProfile:', error);
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      throw new UnauthorizedException('Erreur lors de la récupération du profil');
     }
-
-    return user;
   }
 
   async updateProfile(userId: string, data: { name?: string; email?: string }) {

@@ -7,30 +7,56 @@ export class SettingsService {
   constructor(private prisma: PrismaService) {}
 
   async getSettings() {
-    let settings = await this.prisma.settings.findFirst();
-    
-    if (!settings) {
-      // Créer les paramètres par défaut
-      settings = await this.prisma.settings.create({
-        data: {
-          theme: 'light',
-          currency: 'EUR',
-          language: 'fr',
-          accentColor: '#4CAF50',
-          companyName: 'KAMRI',
-          companyEmail: 'admin@kamri.com',
-          companyPhone: '+33 1 23 45 67 89',
-          companyAddress: '123 Rue de la Paix, 75001 Paris',
-          apiRateLimit: 1000,
-          autoSync: true,
-          notifications: true,
-          emailNotifications: true,
-          smsNotifications: false,
-        },
-      });
-    }
+    try {
+      console.log('⚙️ [SettingsService] getSettings appelé');
+      let settings = await this.prisma.settings.findFirst();
+      
+      if (!settings) {
+        console.log('⚙️ [SettingsService] Aucun paramètre trouvé, création des paramètres par défaut');
+        // Créer les paramètres par défaut
+        settings = await this.prisma.settings.create({
+          data: {
+            theme: 'light',
+            currency: 'EUR',
+            language: 'fr',
+            accentColor: '#4CAF50',
+            companyName: 'KAMRI',
+            companyEmail: 'admin@kamri.com',
+            companyPhone: '+33 1 23 45 67 89',
+            companyAddress: '123 Rue de la Paix, 75001 Paris',
+            apiRateLimit: 1000,
+            autoSync: true,
+            notifications: true,
+            emailNotifications: true,
+            smsNotifications: false,
+          },
+        });
+      }
 
-    return settings;
+      console.log('✅ [SettingsService] Settings récupérées avec succès');
+      return settings;
+    } catch (error) {
+      console.error('❌ [SettingsService] Erreur dans getSettings:', error);
+      // Retourner des valeurs par défaut en cas d'erreur
+      return {
+        id: '',
+        theme: 'light',
+        currency: 'EUR',
+        language: 'fr',
+        accentColor: '#4CAF50',
+        companyName: 'KAMRI',
+        companyEmail: 'admin@kamri.com',
+        companyPhone: '+33 1 23 45 67 89',
+        companyAddress: '123 Rue de la Paix, 75001 Paris',
+        apiRateLimit: 1000,
+        autoSync: true,
+        notifications: true,
+        emailNotifications: true,
+        smsNotifications: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+    }
   }
 
   async updateSettings(updateSettingsDto: UpdateSettingsDto) {

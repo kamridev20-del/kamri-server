@@ -11,6 +11,20 @@ export class DuplicatePreventionController {
   @ApiOperation({ summary: 'Obtenir les statistiques de doublons' })
   @ApiResponse({ status: 200, description: 'Statistiques récupérées avec succès' })
   async getDuplicateStats() {
-    return this.duplicateService.getDuplicateStats();
+    try {
+      console.log('📊 [DuplicateController] getDuplicateStats appelé');
+      const stats = await this.duplicateService.getDuplicateStats();
+      console.log('✅ [DuplicateController] Stats retournées');
+      return stats;
+    } catch (error) {
+      console.error('❌ [DuplicateController] Erreur dans getDuplicateStats:', error);
+      // Retourner des valeurs par défaut en cas d'erreur
+      return {
+        totalProducts: 0,
+        cjProducts: 0,
+        duplicatesFound: 0,
+        lastImports: [],
+      };
+    }
   }
 }

@@ -628,34 +628,52 @@ export class DuplicatePreventionService {
     duplicatesFound: number;
     lastImports: any[];
   }> {
-    const [totalProducts, cjProducts, recentImports] = await Promise.all([
-      this.prisma.product.count(),
-      this.prisma.product.count({ where: { source: 'cj-dropshipping' } }),
-      this.prisma.product.findMany({
-        where: { 
-          lastImportAt: { not: null },
-          source: 'cj-dropshipping'
-        },
-        orderBy: { lastImportAt: 'desc' },
-        take: 10,
-        select: {
-          id: true,
-          name: true,
-          importStatus: true,
-          lastImportAt: true,
-          cjProductId: true
-        }
-      })
-    ]);
+    try {
+      console.log('📊 [DuplicateService] getDuplicateStats appelé');
+      const [totalProducts, cjProducts, recentImports] = await Promise.all([
+        this.prisma.product.count().catch(() => 0),
+        this.prisma.product.count({ where: { source: 'cj-dropshipping' } }).catch(() => 0),
+        this.prisma.product.findMany({
+          where: { 
+            lastImportAt: { not: null },
+            source: 'cj-dropshipping'
+          },
+          orderBy: { lastImportAt: 'desc' },
+          take: 10,
+          select: {
+            id: true,
+            name: true,
+            importStatus: true,
+            lastImportAt: true,
+            cjProductId: true
+          }
+        }).catch(() => [])
+      ]);
 
-    const duplicatesFound = recentImports.filter(p => p.importStatus === 'updated').length;
+      const duplicatesFound = recentImports.filter(p => p.importStatus === 'updated').length;
 
-    return {
-      totalProducts,
-      cjProducts,
-      duplicatesFound,
-      lastImports: recentImports
-    };
+      console.log('✅ [DuplicateService] Stats calculées:', {
+        totalProducts,
+        cjProducts,
+        duplicatesFound,
+        lastImportsCount: recentImports.length
+      });
+
+      return {
+        totalProducts: totalProducts || 0,
+        cjProducts: cjProducts || 0,
+        duplicatesFound,
+        lastImports: recentImports || []
+      };
+    } catch (error) {
+      console.error('❌ [DuplicateService] Erreur dans getDuplicateStats:', error);
+      return {
+        totalProducts: 0,
+        cjProducts: 0,
+        duplicatesFound: 0,
+        lastImports: [],
+      };
+    }
   }
 
   /**
