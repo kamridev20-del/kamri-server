@@ -1,9 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SuppliersService } from '../suppliers/suppliers.service';
 
 @Injectable()
 export class DashboardService {
+  private readonly logger = new Logger(DashboardService.name);
+  private readonly isProduction = process.env.NODE_ENV === 'production';
+
   constructor(
     private prisma: PrismaService,
     private suppliersService: SuppliersService
@@ -12,17 +15,23 @@ export class DashboardService {
   async getStats() {
     const startTime = Date.now();
     try {
-      console.log('📊 [DashboardService] getStats appelé');
+      if (!this.isProduction) {
+        this.logger.debug('📊 getStats appelé');
+      }
       
       // S'assurer que le fournisseur CJ Dropshipping existe et est connecté
       try {
-        console.log('📊 [DashboardService] Appel ensureCJSupplierExists...');
+        if (!this.isProduction) {
+          this.logger.debug('📊 Appel ensureCJSupplierExists...');
+        }
         const supplierStart = Date.now();
         await this.suppliersService.ensureCJSupplierExists();
-        console.log(`✅ [DashboardService] ensureCJSupplierExists terminé en ${Date.now() - supplierStart}ms`);
+        const supplierDuration = Date.now() - supplierStart;
+        if (!this.isProduction || supplierDuration > 1000) {
+          this.logger.debug(`✅ ensureCJSupplierExists terminé en ${supplierDuration}ms`);
+        }
       } catch (error) {
-        console.warn('⚠️ [DashboardService] Impossible de créer/vérifier le fournisseur CJ:', error);
-        console.warn('   Stack:', error instanceof Error ? error.stack : 'N/A');
+        this.logger.warn('⚠️ Impossible de créer/vérifier le fournisseur CJ:', error instanceof Error ? error.message : String(error));
       }
       
       const now = new Date();
@@ -30,16 +39,14 @@ export class DashboardService {
       const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
       
-      console.log('📊 [DashboardService] Exécution des requêtes Prisma...');
-      console.log('📊 [DashboardService] Dates calculées:', {
-        now: now.toISOString(),
-        currentMonthStart: currentMonthStart.toISOString(),
-        lastMonthStart: lastMonthStart.toISOString(),
-        lastMonthEnd: lastMonthEnd.toISOString(),
-      });
+      if (!this.isProduction) {
+        this.logger.debug('📊 Exécution des requêtes Prisma...');
+      }
       
       const queryStartTime = Date.now();
-      console.log('📊 [DashboardService] Début Promise.all...');
+      if (!this.isProduction) {
+        this.logger.debug('📊 Début Promise.all...');
+      }
       
       const [
         totalProducts,
@@ -137,17 +144,10 @@ export class DashboardService {
       ]);
 
       const queryDuration = Date.now() - queryStartTime;
-      console.log(`✅ [DashboardService] Requêtes Prisma terminées en ${queryDuration}ms`);
-      console.log('📊 [DashboardService] Résultats:', {
-        totalProducts,
-        promoProducts,
-        totalOrders,
-        connectedSuppliers,
-        totalUsers,
-        activeUsers,
-        totalRevenue: totalRevenue?._sum?.total,
-        monthlyRevenue: monthlyRevenue?._sum?.total,
-      });
+      // ✅ Logger seulement si la requête est lente (>2s) ou en dev
+      if (!this.isProduction || queryDuration > 2000) {
+        this.logger.log(`✅ Requêtes Prisma terminées en ${queryDuration}ms`);
+      }
 
       // Calculer les pourcentages de changement
       const calculateChange = (current: number, previous: number) => {
@@ -175,12 +175,17 @@ export class DashboardService {
       };
 
       const totalDuration = Date.now() - startTime;
-      console.log(`✅ [DashboardService] Stats calculées et retournées en ${totalDuration}ms total`);
+      // ✅ Logger seulement si la requête est lente (>2s) ou en dev
+      if (!this.isProduction || totalDuration > 2000) {
+        this.logger.log(`✅ Stats calculées et retournées en ${totalDuration}ms total`);
+      }
       return result;
     } catch (error) {
-      console.error('❌ [DashboardService] Erreur dans getStats:', error);
-      console.error('❌ [DashboardService] Stack:', error instanceof Error ? error.stack : 'N/A');
-      console.error('❌ [DashboardService] Message:', error instanceof Error ? error.message : String(error));
+      // ✅ Toujours logger les erreurs
+      this.logger.error('❌ Erreur dans getStats:', error instanceof Error ? error.message : String(error));
+      if (error instanceof Error && error.stack) {
+        this.logger.error(`   Stack: ${error.stack}`);
+      }
       // Retourner des valeurs par défaut en cas d'erreur
       return {
         totalProducts: 0,
@@ -269,14 +274,18 @@ export class DashboardService {
 
   async getTopCategories() {
     try {
-      console.log('📊 [DashboardService] getTopCategories appelé');
+      if (!this.isProduction) {
+        this.logger.debug('📊 getTopCategories appelé');
+      }
       
       // ✅ Récupérer toutes les catégories
       const categories = await this.prisma.category.findMany({
         take: 20, // Prendre plus pour avoir un meilleur tri
       });
 
-      console.log(`📊 [DashboardService] ${categories.length} catégories trouvées`);
+      if (!this.isProduction) {
+        this.logger.debug(`${categories.length} catégories trouvées`);
+      }
 
       // ✅ Compter les produits actifs pour chaque catégorie
       const categoriesWithCount = await Promise.all(
@@ -293,7 +302,7 @@ export class DashboardService {
               productCount: activeCount,
             };
           } catch (error) {
-            console.error(`❌ [DashboardService] Erreur comptage produits catégorie ${category.id}:`, error);
+            this.logger.error(`❌ Erreur comptage produits catégorie ${category.id}:`, error instanceof Error ? error.message : String(error));
             return {
               name: category.name,
               productCount: 0,
@@ -307,11 +316,15 @@ export class DashboardService {
         .sort((a, b) => b.productCount - a.productCount)
         .slice(0, 7);
 
-      console.log(`✅ [DashboardService] Top catégories retournées:`, sorted);
+      if (!this.isProduction) {
+        this.logger.debug(`✅ Top catégories retournées: ${sorted.length} catégories`);
+      }
       return sorted;
     } catch (error) {
-      console.error('❌ [DashboardService] Erreur dans getTopCategories:', error);
-      console.error('❌ [DashboardService] Stack:', error instanceof Error ? error.stack : 'N/A');
+      this.logger.error('❌ Erreur dans getTopCategories:', error instanceof Error ? error.message : String(error));
+      if (error instanceof Error && error.stack) {
+        this.logger.error(`   Stack: ${error.stack}`);
+      }
       // Retourner un tableau vide en cas d'erreur
       return [];
     }

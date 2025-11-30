@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
@@ -6,6 +6,9 @@ import { AuthService } from './auth.service';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
+  private readonly logger = new Logger(JwtStrategy.name);
+  private readonly isProduction = process.env.NODE_ENV === 'production';
+
   constructor(
     private authService: AuthService,
     private configService: ConfigService,
@@ -17,11 +20,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const finalSecret = secret || (isProduction ? null : 'kamri-secret-key-dev-only');
     
     if (!finalSecret && isProduction) {
-      console.error('❌ [JwtStrategy] ERREUR: JWT_SECRET non défini en production!');
+      this.logger.error('❌ ERREUR: JWT_SECRET non défini en production!');
       throw new Error('JWT_SECRET must be defined in production environment');
     }
     
-    console.log('🔐 [JwtStrategy] Initialisation avec secret:', finalSecret ? finalSecret.substring(0, 10) + '...' : 'DÉFAUT');
+    // ✅ Logger seulement au démarrage, pas à chaque requête
+    if (!isProduction) {
+      this.logger.log(`🔐 Initialisation avec secret: ${finalSecret ? finalSecret.substring(0, 10) + '...' : 'DÉFAUT'}`);
+    }
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
@@ -30,9 +36,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any) {
-    console.log('🔍 [JwtStrategy] Validation du token pour:', payload.email);
+    // ✅ Réduire les logs en production pour éviter le rate limit Railway
+    if (!this.isProduction) {
+      this.logger.debug(`🔍 Validation du token pour: ${payload.email}`);
+    }
     const user = { userId: payload.sub, email: payload.email, role: payload.role };
-    console.log('✅ [JwtStrategy] Token validé:', user);
+    if (!this.isProduction) {
+      this.logger.debug(`✅ Token validé: ${JSON.stringify(user)}`);
+    }
     return user;
   }
 }

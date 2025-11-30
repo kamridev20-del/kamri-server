@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, UseGuards, Logger } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { DashboardService } from './dashboard.service';
@@ -8,6 +8,9 @@ import { DashboardService } from './dashboard.service';
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class DashboardController {
+  private readonly logger = new Logger(DashboardController.name);
+  private readonly isProduction = process.env.NODE_ENV === 'production';
+
   constructor(private readonly dashboardService: DashboardService) {}
 
   @Get('stats')
@@ -16,23 +19,27 @@ export class DashboardController {
   async getStats() {
     const controllerStartTime = Date.now();
     try {
-      console.log('📊 [DashboardController] getStats appelé - Début');
-      console.log('📊 [DashboardController] Appel dashboardService.getStats()...');
+      if (!this.isProduction) {
+        this.logger.debug('📊 getStats appelé - Début');
+      }
       const serviceStartTime = Date.now();
       const stats = await this.dashboardService.getStats();
       const serviceDuration = Date.now() - serviceStartTime;
-      console.log(`✅ [DashboardController] dashboardService.getStats() terminé en ${serviceDuration}ms`);
-      console.log('✅ [DashboardController] Stats retournées:', JSON.stringify(stats, null, 2));
       const totalDuration = Date.now() - controllerStartTime;
-      console.log(`✅ [DashboardController] getStats terminé en ${totalDuration}ms total`);
+      
+      // ✅ Logger seulement en dev ou si la requête est lente (>2s)
+      if (!this.isProduction || totalDuration > 2000) {
+        this.logger.log(`✅ getStats terminé en ${totalDuration}ms (service: ${serviceDuration}ms)`);
+      }
+      
       return stats;
     } catch (error) {
       const totalDuration = Date.now() - controllerStartTime;
-      console.error(`❌ [DashboardController] Erreur dans getStats après ${totalDuration}ms:`, error);
-      console.error('   Message:', error instanceof Error ? error.message : String(error));
-      console.error('   Stack:', error instanceof Error ? error.stack : 'N/A');
-      console.error('   Code:', (error as any)?.code);
-      console.error('   Meta:', (error as any)?.meta);
+      // ✅ Toujours logger les erreurs
+      this.logger.error(`❌ Erreur dans getStats après ${totalDuration}ms:`, error instanceof Error ? error.message : String(error));
+      if (error instanceof Error && error.stack) {
+        this.logger.error(`   Stack: ${error.stack}`);
+      }
       // Retourner des valeurs par défaut en cas d'erreur
       return {
         totalProducts: 0,
@@ -73,12 +80,16 @@ export class DashboardController {
   @ApiResponse({ status: 200, description: 'Top catégories récupérées avec succès' })
   async getTopCategories() {
     try {
-      console.log('📊 [DashboardController] getTopCategories appelé');
+      if (!this.isProduction) {
+        this.logger.debug('📊 getTopCategories appelé');
+      }
       const categories = await this.dashboardService.getTopCategories();
-      console.log('✅ [DashboardController] Top catégories retournées:', categories);
+      if (!this.isProduction) {
+        this.logger.debug(`✅ Top catégories retournées: ${categories.length} catégories`);
+      }
       return categories;
     } catch (error) {
-      console.error('❌ [DashboardController] Erreur dans getTopCategories:', error);
+      this.logger.error('❌ Erreur dans getTopCategories:', error instanceof Error ? error.message : String(error));
       // Retourner un tableau vide en cas d'erreur
       return [];
     }
