@@ -717,13 +717,19 @@ export class ProductsService {
     await this.recordSearch(searchTerm);
 
     try {
-      // Rechercher les produits
+      // Rechercher les produits - Recherche dans les champs multilingues
       const products = await this.prisma.product.findMany({
         where: {
           status: 'active',
           OR: [
+            // Anciens champs (pour compatibilité)
             { name: { contains: searchTerm, mode: 'insensitive' } },
             { description: { contains: searchTerm, mode: 'insensitive' } },
+            // Nouveaux champs multilingues
+            { name_fr: { contains: searchTerm, mode: 'insensitive' } },
+            { name_en: { contains: searchTerm, mode: 'insensitive' } },
+            { description_fr: { contains: searchTerm, mode: 'insensitive' } },
+            { description_en: { contains: searchTerm, mode: 'insensitive' } },
             { brand: { contains: searchTerm, mode: 'insensitive' } },
           ],
         },
@@ -779,13 +785,19 @@ export class ProductsService {
         },
       });
 
-      // Compter le total de produits correspondants
+      // Compter le total de produits correspondants - Recherche dans les champs multilingues
       const totalProducts = await this.prisma.product.count({
         where: {
           status: 'active',
           OR: [
+            // Anciens champs (pour compatibilité)
             { name: { contains: searchTerm, mode: 'insensitive' } },
             { description: { contains: searchTerm, mode: 'insensitive' } },
+            // Nouveaux champs multilingues
+            { name_fr: { contains: searchTerm, mode: 'insensitive' } },
+            { name_en: { contains: searchTerm, mode: 'insensitive' } },
+            { description_fr: { contains: searchTerm, mode: 'insensitive' } },
+            { description_en: { contains: searchTerm, mode: 'insensitive' } },
             { brand: { contains: searchTerm, mode: 'insensitive' } },
           ],
         },
