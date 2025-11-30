@@ -119,3 +119,4 @@ async getStats() {
 - Les requêtes prennent ~1.6s en local, ce qui devrait être acceptable
 - Le problème est probablement lié à la configuration Railway ou aux ressources
 
+

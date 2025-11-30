@@ -477,3 +477,4 @@ En cas de problème après optimisation, vérifier :
 2. Le serveur redémarre après modification
 3. Les logs Railway pour voir ce qui consomme encore
 
+

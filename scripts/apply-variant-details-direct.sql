@@ -44,3 +44,4 @@ FROM information_schema.columns
 WHERE table_name = 'cart_items' 
 AND column_name IN ('variantId', 'variantDetails');
 
+

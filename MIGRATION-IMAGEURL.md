@@ -71,3 +71,4 @@ La colonne `imageUrl` est **optionnelle** (`String?`), donc :
 
 
 
+

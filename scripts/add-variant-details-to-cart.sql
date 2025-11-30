@@ -32,3 +32,4 @@ END $$;
 COMMENT ON COLUMN cart_items."variantId" IS 'ID du variant choisi (optionnel)';
 COMMENT ON COLUMN cart_items."variantDetails" IS 'Détails du variant (taille, couleur, etc.) au format JSON';
 
+

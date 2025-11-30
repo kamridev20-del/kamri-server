@@ -145,3 +145,4 @@ Vérifier que tous les imports sont corrects et que les fichiers ont été copi�
 2. Vérifier que `CURRENCY_API_KEY` est défini
 3. Vérifier les logs pour voir les erreurs éventuelles
 
+
