@@ -2002,7 +2002,11 @@ export class ProductsService {
     id: string,
     updateData: {
       name?: string;
+      name_fr?: string;
+      name_en?: string;
       description?: string;
+      description_fr?: string;
+      description_en?: string;
       price?: number;
       originalPrice?: number;
       stock?: number;
@@ -2032,8 +2036,34 @@ export class ProductsService {
         data.name = this.cleanProductName(updateData.name);
       }
 
+      // Gérer les champs multilingues pour le nom
+      if (updateData.name_fr !== undefined) {
+        data.name_fr = updateData.name_fr && updateData.name_fr.trim() !== '' 
+          ? this.cleanProductName(updateData.name_fr) 
+          : null;
+      }
+
+      if (updateData.name_en !== undefined) {
+        data.name_en = updateData.name_en && updateData.name_en.trim() !== '' 
+          ? this.cleanProductName(updateData.name_en) 
+          : null;
+      }
+
       if (updateData.description !== undefined && updateData.description !== null) {
         data.description = this.formatProductDescription(updateData.description);
+      }
+
+      // Gérer les champs multilingues pour la description
+      if (updateData.description_fr !== undefined) {
+        data.description_fr = updateData.description_fr && updateData.description_fr.trim() !== '' 
+          ? this.formatProductDescription(updateData.description_fr) 
+          : null;
+      }
+
+      if (updateData.description_en !== undefined) {
+        data.description_en = updateData.description_en && updateData.description_en.trim() !== '' 
+          ? this.formatProductDescription(updateData.description_en) 
+          : null;
       }
 
       if (updateData.price !== undefined && updateData.price !== null) {
