@@ -14,13 +14,25 @@ export class DashboardController {
   @ApiOperation({ summary: 'Récupérer les statistiques du dashboard' })
   @ApiResponse({ status: 200, description: 'Statistiques récupérées avec succès' })
   async getStats() {
+    const controllerStartTime = Date.now();
     try {
-      console.log('📊 [DashboardController] getStats appelé');
+      console.log('📊 [DashboardController] getStats appelé - Début');
+      console.log('📊 [DashboardController] Appel dashboardService.getStats()...');
+      const serviceStartTime = Date.now();
       const stats = await this.dashboardService.getStats();
-      console.log('✅ [DashboardController] Stats retournées:', stats);
+      const serviceDuration = Date.now() - serviceStartTime;
+      console.log(`✅ [DashboardController] dashboardService.getStats() terminé en ${serviceDuration}ms`);
+      console.log('✅ [DashboardController] Stats retournées:', JSON.stringify(stats, null, 2));
+      const totalDuration = Date.now() - controllerStartTime;
+      console.log(`✅ [DashboardController] getStats terminé en ${totalDuration}ms total`);
       return stats;
     } catch (error) {
-      console.error('❌ [DashboardController] Erreur dans getStats:', error);
+      const totalDuration = Date.now() - controllerStartTime;
+      console.error(`❌ [DashboardController] Erreur dans getStats après ${totalDuration}ms:`, error);
+      console.error('   Message:', error instanceof Error ? error.message : String(error));
+      console.error('   Stack:', error instanceof Error ? error.stack : 'N/A');
+      console.error('   Code:', (error as any)?.code);
+      console.error('   Meta:', (error as any)?.meta);
       // Retourner des valeurs par défaut en cas d'erreur
       return {
         totalProducts: 0,

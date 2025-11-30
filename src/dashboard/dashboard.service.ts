@@ -10,14 +10,19 @@ export class DashboardService {
   ) {}
 
   async getStats() {
+    const startTime = Date.now();
     try {
       console.log('📊 [DashboardService] getStats appelé');
       
       // S'assurer que le fournisseur CJ Dropshipping existe et est connecté
       try {
+        console.log('📊 [DashboardService] Appel ensureCJSupplierExists...');
+        const supplierStart = Date.now();
         await this.suppliersService.ensureCJSupplierExists();
+        console.log(`✅ [DashboardService] ensureCJSupplierExists terminé en ${Date.now() - supplierStart}ms`);
       } catch (error) {
         console.warn('⚠️ [DashboardService] Impossible de créer/vérifier le fournisseur CJ:', error);
+        console.warn('   Stack:', error instanceof Error ? error.stack : 'N/A');
       }
       
       const now = new Date();
@@ -26,6 +31,15 @@ export class DashboardService {
       const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
       
       console.log('📊 [DashboardService] Exécution des requêtes Prisma...');
+      console.log('📊 [DashboardService] Dates calculées:', {
+        now: now.toISOString(),
+        currentMonthStart: currentMonthStart.toISOString(),
+        lastMonthStart: lastMonthStart.toISOString(),
+        lastMonthEnd: lastMonthEnd.toISOString(),
+      });
+      
+      const queryStartTime = Date.now();
+      console.log('📊 [DashboardService] Début Promise.all...');
       
       const [
         totalProducts,
@@ -120,9 +134,10 @@ export class DashboardService {
           },
         },
       }),
-    ]);
+      ]);
 
-      console.log('✅ [DashboardService] Requêtes Prisma terminées');
+      const queryDuration = Date.now() - queryStartTime;
+      console.log(`✅ [DashboardService] Requêtes Prisma terminées en ${queryDuration}ms`);
       console.log('📊 [DashboardService] Résultats:', {
         totalProducts,
         promoProducts,
@@ -159,7 +174,8 @@ export class DashboardService {
         },
       };
 
-      console.log('✅ [DashboardService] Stats calculées et retournées');
+      const totalDuration = Date.now() - startTime;
+      console.log(`✅ [DashboardService] Stats calculées et retournées en ${totalDuration}ms total`);
       return result;
     } catch (error) {
       console.error('❌ [DashboardService] Erreur dans getStats:', error);

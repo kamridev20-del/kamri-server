@@ -38,7 +38,9 @@
     "db:migrate-to-postgres": "bash scripts/migrate-to-postgresql.sh",
     "db:migrate-data": "ts-node -r tsconfig-paths/register scripts/migrate-to-postgresql.ts",
     "db:migrate-data:sqlite3": "ts-node -r tsconfig-paths/register scripts/migrate-with-sqlite3.ts",
-    "db:add-multilingual": "node scripts/add-multilingual-fields.js"
+    "db:add-multilingual": "node scripts/add-multilingual-fields.js",
+    "diagnose:stats": "node scripts/diagnose-stats-errors.js",
+    "test:getStats": "node scripts/test-exact-getStats.js"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
